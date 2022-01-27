@@ -16,8 +16,11 @@ import (
 )
 
 var (
-	etcdAddr = flag.String("etcd", "127.0.0.1:2379", "Etcd Endpoint to connect")
-	rootPath = flag.String("rootPath", "by-dev/meta/datacoord-meta/s", "Datacoord Segment root path to iterate")
+	cmd = flag.String("cmd", "segment", "Datacoord meta command")
+
+	etcdAddr    = flag.String("etcd", "127.0.0.1:2379", "Etcd Endpoint to connect")
+	rootPath    = flag.String("rootPath", "by-dev/meta/datacoord-meta/s", "Datacoord Segment root path to iterate")
+	channelPath = flag.String("channelPath", "by-dev/meta/channelwatch", "DataCoord Channel path to iterate")
 
 	collectionID  = flag.Int64("collection", 0, "Collection ID to filter with")
 	partitionID   = flag.Int64("partition", 0, "Partition ID to filter with")
@@ -29,11 +32,41 @@ var (
 func main() {
 	flag.Parse()
 
+	switch *cmd {
+	case "segment":
+		segmentMeta()
+	case "channel":
+		channelMeta()
+	}
+}
+
+func channelMeta() {
 	etcdCli, err := etcd.GetRemoteEtcdClient([]string{*etcdAddr})
 	if err != nil {
 		log.Fatal("failed to connect to etcd", zap.Error(err))
 	}
+	etcdkv := etcdkv.NewEtcdKV(etcdCli, *channelPath)
 
+	keys, values, err := etcdkv.LoadWithPrefix("/")
+	if err != nil {
+		log.Fatal("failed to list ", zap.Error(err))
+	}
+	for i := range keys {
+		info := &datapb.ChannelWatchInfo{}
+		err = proto.Unmarshal([]byte(values[i]), info)
+		if err != nil {
+			continue
+		}
+
+		fmt.Printf("Watch key %s, channel name: %s\n", keys[i], info.Vchan.ChannelName)
+	}
+}
+
+func segmentMeta() {
+	etcdCli, err := etcd.GetRemoteEtcdClient([]string{*etcdAddr})
+	if err != nil {
+		log.Fatal("failed to connect to etcd", zap.Error(err))
+	}
 	etcdkv := etcdkv.NewEtcdKV(etcdCli, *rootPath)
 
 	keys, values, err := etcdkv.LoadWithPrefix("/")
