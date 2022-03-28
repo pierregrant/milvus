@@ -884,6 +884,7 @@ func (qc *QueryCoord) LoadBalance(ctx context.Context, req *querypb.LoadBalanceR
 		zap.Int64s("source nodeIDs", req.SourceNodeIDs),
 		zap.Int64s("dst nodeIDs", req.DstNodeIDs),
 		zap.Int64s("balanced segments", req.SealedSegmentIDs),
+		zap.Int64("collectionID", req.CollectionID),
 		zap.Int64("msgID", req.Base.MsgID))
 
 	status := &commonpb.Status{
@@ -930,6 +931,7 @@ func (qc *QueryCoord) LoadBalance(ctx context.Context, req *querypb.LoadBalanceR
 		zap.Int64s("source nodeIDs", req.SourceNodeIDs),
 		zap.Int64s("dst nodeIDs", req.DstNodeIDs),
 		zap.Int64s("balanced segments", req.SealedSegmentIDs),
+		zap.Int64("collectionID", req.CollectionID),
 		zap.Int64("msgID", req.Base.MsgID))
 
 	return status, nil

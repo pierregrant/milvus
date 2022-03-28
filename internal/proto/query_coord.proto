@@ -282,6 +282,7 @@ message LoadBalanceRequest {
   TriggerCondition balance_reason = 3;
   repeated int64 dst_nodeIDs = 4;
   repeated int64 sealed_segmentIDs = 5;
+  int64 collectionID = 6;
 }
 
 //-------------------- internal meta proto------------------
@@ -382,3 +383,15 @@ message SealedSegmentsChangeInfo {
   repeated SegmentChangeInfo infos = 2;
 }
 
+message ReplicaInfo {    // ReplicaGroup
+  int64 replica_id = 1;
+  int64 collection_id = 2;
+  repeated int64 partition_ids = 3;    // empty indicates to load collection
+  repeated ShardReplica shard_replicas = 4;
+  repeated int64 node_ids = 5; // include leaders
+}
+
+message ShardReplica {
+    int64 leader = 1;
+    string dm_channel_name = 2;
+}

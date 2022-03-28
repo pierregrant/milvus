@@ -11869,6 +11869,7 @@ class LoadBalanceRequest :
   enum : int {
     kDstNodeIDsFieldNumber = 3,
     kSealedSegmentIDsFieldNumber = 4,
+    kCollectionNameFieldNumber = 5,
     kBaseFieldNumber = 1,
     kSrcNodeIDFieldNumber = 2,
   };
@@ -11894,6 +11895,17 @@ class LoadBalanceRequest :
   ::PROTOBUF_NAMESPACE_ID::RepeatedField< ::PROTOBUF_NAMESPACE_ID::int64 >*
       mutable_sealed_segmentids();
 
+  // string collectionName = 5;
+  void clear_collectionname();
+  const std::string& collectionname() const;
+  void set_collectionname(const std::string& value);
+  void set_collectionname(std::string&& value);
+  void set_collectionname(const char* value);
+  void set_collectionname(const char* value, size_t size);
+  std::string* mutable_collectionname();
+  std::string* release_collectionname();
+  void set_allocated_collectionname(std::string* collectionname);
+
   // .milvus.proto.common.MsgBase base = 1;
   bool has_base() const;
   void clear_base();
@@ -11916,6 +11928,7 @@ class LoadBalanceRequest :
   mutable std::atomic<int> _dst_nodeids_cached_byte_size_;
   ::PROTOBUF_NAMESPACE_ID::RepeatedField< ::PROTOBUF_NAMESPACE_ID::int64 > sealed_segmentids_;
   mutable std::atomic<int> _sealed_segmentids_cached_byte_size_;
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr collectionname_;
   ::milvus::proto::common::MsgBase* base_;
   ::PROTOBUF_NAMESPACE_ID::int64 src_nodeid_;
   mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
@@ -26797,9 +26810,70 @@ ImportRequest::mutable_channel_names() {
   return &channel_names_;
 }
 
+<<<<<<< HEAD
 // bool row_based = 4;
 inline void ImportRequest::clear_row_based() {
   row_based_ = false;
+=======
+// string collectionName = 5;
+inline void LoadBalanceRequest::clear_collectionname() {
+  collectionname_.ClearToEmptyNoArena(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited());
+}
+inline const std::string& LoadBalanceRequest::collectionname() const {
+  // @@protoc_insertion_point(field_get:milvus.proto.milvus.LoadBalanceRequest.collectionName)
+  return collectionname_.GetNoArena();
+}
+inline void LoadBalanceRequest::set_collectionname(const std::string& value) {
+  
+  collectionname_.SetNoArena(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), value);
+  // @@protoc_insertion_point(field_set:milvus.proto.milvus.LoadBalanceRequest.collectionName)
+}
+inline void LoadBalanceRequest::set_collectionname(std::string&& value) {
+  
+  collectionname_.SetNoArena(
+    &::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), ::std::move(value));
+  // @@protoc_insertion_point(field_set_rvalue:milvus.proto.milvus.LoadBalanceRequest.collectionName)
+}
+inline void LoadBalanceRequest::set_collectionname(const char* value) {
+  GOOGLE_DCHECK(value != nullptr);
+  
+  collectionname_.SetNoArena(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), ::std::string(value));
+  // @@protoc_insertion_point(field_set_char:milvus.proto.milvus.LoadBalanceRequest.collectionName)
+}
+inline void LoadBalanceRequest::set_collectionname(const char* value, size_t size) {
+  
+  collectionname_.SetNoArena(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(),
+      ::std::string(reinterpret_cast<const char*>(value), size));
+  // @@protoc_insertion_point(field_set_pointer:milvus.proto.milvus.LoadBalanceRequest.collectionName)
+}
+inline std::string* LoadBalanceRequest::mutable_collectionname() {
+  
+  // @@protoc_insertion_point(field_mutable:milvus.proto.milvus.LoadBalanceRequest.collectionName)
+  return collectionname_.MutableNoArena(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited());
+}
+inline std::string* LoadBalanceRequest::release_collectionname() {
+  // @@protoc_insertion_point(field_release:milvus.proto.milvus.LoadBalanceRequest.collectionName)
+  
+  return collectionname_.ReleaseNoArena(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited());
+}
+inline void LoadBalanceRequest::set_allocated_collectionname(std::string* collectionname) {
+  if (collectionname != nullptr) {
+    
+  } else {
+    
+  }
+  collectionname_.SetAllocatedNoArena(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), collectionname);
+  // @@protoc_insertion_point(field_set_allocated:milvus.proto.milvus.LoadBalanceRequest.collectionName)
+}
+
+// -------------------------------------------------------------------
+
+// ManualCompactionRequest
+
+// int64 collectionID = 1;
+inline void ManualCompactionRequest::clear_collectionid() {
+  collectionid_ = PROTOBUF_LONGLONG(0);
+>>>>>>> auto balance
 }
 inline bool ImportRequest::row_based() const {
   // @@protoc_insertion_point(field_get:milvus.proto.milvus.ImportRequest.row_based)
