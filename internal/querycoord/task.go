@@ -1222,7 +1222,7 @@ func (lst *loadSegmentTask) reschedule(ctx context.Context) ([]task, error) {
 	if lst.getParentTask().getTriggerCondition() == querypb.TriggerCondition_NodeDown {
 		wait2AssignTaskSuccess = true
 	}
-	reScheduledTasks, err := assignInternalTask(ctx, lst.getParentTask(), lst.meta, lst.cluster, loadSegmentReqs, nil, wait2AssignTaskSuccess, lst.excludeNodeIDs, nil)
+	reScheduledTasks, err := assignInternalTask(ctx, lst.getParentTask(), lst.meta, lst.cluster, loadSegmentReqs, nil, wait2AssignTaskSuccess, lst.excludeNodeIDs, nil, -1)
 	if err != nil {
 		log.Error("loadSegment reschedule failed", zap.Int64s("excludeNodes", lst.excludeNodeIDs), zap.Int64("taskID", lst.getTaskID()), zap.Error(err))
 		return nil, err
@@ -1401,7 +1401,7 @@ func (wdt *watchDmChannelTask) reschedule(ctx context.Context) ([]task, error) {
 	if wdt.getParentTask().getTriggerCondition() == querypb.TriggerCondition_NodeDown {
 		wait2AssignTaskSuccess = true
 	}
-	reScheduledTasks, err := assignInternalTask(ctx, wdt.parentTask, wdt.meta, wdt.cluster, nil, watchDmChannelReqs, wait2AssignTaskSuccess, wdt.excludeNodeIDs, nil)
+	reScheduledTasks, err := assignInternalTask(ctx, wdt.parentTask, wdt.meta, wdt.cluster, nil, watchDmChannelReqs, wait2AssignTaskSuccess, wdt.excludeNodeIDs, nil, -1)
 	if err != nil {
 		log.Error("watchDmChannel reschedule failed", zap.Int64("taskID", wdt.getTaskID()), zap.Int64s("excludeNodes", wdt.excludeNodeIDs), zap.Error(err))
 		return nil, err
@@ -1690,7 +1690,7 @@ func (ht *handoffTask) execute(ctx context.Context) error {
 				ht.setResultInfo(err)
 				return err
 			}
-			internalTasks, err := assignInternalTask(ctx, ht, ht.meta, ht.cluster, []*querypb.LoadSegmentsRequest{loadSegmentReq}, nil, true, nil, nil)
+			internalTasks, err := assignInternalTask(ctx, ht, ht.meta, ht.cluster, []*querypb.LoadSegmentsRequest{loadSegmentReq}, nil, true, nil, nil, -1)
 			if err != nil {
 				log.Error("handoffTask: assign child task failed", zap.Int64("collectionID", collectionID), zap.Int64("segmentID", segmentID), zap.Error(err))
 				ht.setResultInfo(err)
@@ -1894,7 +1894,7 @@ func (lbt *loadBalanceTask) execute(ctx context.Context) error {
 				}
 			}
 		}
-		internalTasks, err := assignInternalTask(ctx, lbt, lbt.meta, lbt.cluster, loadSegmentReqs, watchDmChannelReqs, true, lbt.SourceNodeIDs, lbt.DstNodeIDs)
+		internalTasks, err := assignInternalTask(ctx, lbt, lbt.meta, lbt.cluster, loadSegmentReqs, watchDmChannelReqs, true, lbt.SourceNodeIDs, lbt.DstNodeIDs, -1)
 		if err != nil {
 			log.Error("loadBalanceTask: assign child task failed", zap.Int64s("sourceNodeIDs", lbt.SourceNodeIDs))
 			lbt.setResultInfo(err)
@@ -2021,7 +2021,7 @@ func (lbt *loadBalanceTask) execute(ctx context.Context) error {
 				return err
 			}
 		}
-		internalTasks, err := assignInternalTask(ctx, lbt, lbt.meta, lbt.cluster, loadSegmentReqs, nil, false, lbt.SourceNodeIDs, lbt.DstNodeIDs)
+		internalTasks, err := assignInternalTask(ctx, lbt, lbt.meta, lbt.cluster, loadSegmentReqs, nil, false, lbt.SourceNodeIDs, lbt.DstNodeIDs, -1)
 		if err != nil {
 			log.Error("loadBalanceTask: assign child task failed", zap.Any("balance request", lbt.LoadBalanceRequest))
 			lbt.setResultInfo(err)
@@ -2072,17 +2072,17 @@ func assignInternalTask(ctx context.Context,
 	parentTask task, meta Meta, cluster Cluster,
 	loadSegmentRequests []*querypb.LoadSegmentsRequest,
 	watchDmChannelRequests []*querypb.WatchDmChannelsRequest,
-	wait bool, excludeNodeIDs []int64, includeNodeIDs []int64) ([]task, error) {
+	wait bool, excludeNodeIDs []int64, includeNodeIDs []int64, replicaID int64) ([]task, error) {
 	log.Debug("assignInternalTask: start assign task to query node")
 	internalTasks := make([]task, 0)
-	err := cluster.allocateSegmentsToQueryNode(ctx, loadSegmentRequests, wait, excludeNodeIDs, includeNodeIDs)
+	err := cluster.allocateSegmentsToQueryNode(ctx, loadSegmentRequests, wait, excludeNodeIDs, includeNodeIDs, replicaID)
 	if err != nil {
 		log.Error("assignInternalTask: assign segment to node failed", zap.Any("load segments requests", loadSegmentRequests))
 		return nil, err
 	}
 	log.Debug("assignInternalTask: assign segment to node success")
 
-	err = cluster.allocateChannelsToQueryNode(ctx, watchDmChannelRequests, wait, excludeNodeIDs, includeNodeIDs)
+	err = cluster.allocateChannelsToQueryNode(ctx, watchDmChannelRequests, wait, excludeNodeIDs, replicaID)
 	if err != nil {
 		log.Error("assignInternalTask: assign dmChannel to node failed", zap.Any("watch dmChannel requests", watchDmChannelRequests))
 		return nil, err
