@@ -618,6 +618,7 @@ type LoadPartitionsRequest struct {
 	CollectionID         int64                      `protobuf:"varint,3,opt,name=collectionID,proto3" json:"collectionID,omitempty"`
 	PartitionIDs         []int64                    `protobuf:"varint,4,rep,packed,name=partitionIDs,proto3" json:"partitionIDs,omitempty"`
 	Schema               *schemapb.CollectionSchema `protobuf:"bytes,5,opt,name=schema,proto3" json:"schema,omitempty"`
+	ReplicaNumber        int32                      `protobuf:"varint,6,opt,name=replica_number,json=replicaNumber,proto3" json:"replica_number,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                   `json:"-"`
 	XXX_unrecognized     []byte                     `json:"-"`
 	XXX_sizecache        int32                      `json:"-"`
@@ -700,11 +701,30 @@ func (x *LoadPartitionsRequest) GetSchema() *schemapb.CollectionSchema {
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 func (x *LoadPartitionsRequest) GetReplicaNumber() int32 {
 	if x != nil {
 		return x.ReplicaNumber
 	}
 	return 0
+=======
+func (m *LoadPartitionsRequest) GetReplicaNumber() int32 {
+	if m != nil {
+		return m.ReplicaNumber
+	}
+	return 0
+}
+
+type ReleasePartitionsRequest struct {
+	Base                 *commonpb.MsgBase `protobuf:"bytes,1,opt,name=base,proto3" json:"base,omitempty"`
+	DbID                 int64             `protobuf:"varint,2,opt,name=dbID,proto3" json:"dbID,omitempty"`
+	CollectionID         int64             `protobuf:"varint,3,opt,name=collectionID,proto3" json:"collectionID,omitempty"`
+	PartitionIDs         []int64           `protobuf:"varint,4,rep,packed,name=partitionIDs,proto3" json:"partitionIDs,omitempty"`
+	NodeID               int64             `protobuf:"varint,5,opt,name=nodeID,proto3" json:"nodeID,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
+	XXX_unrecognized     []byte            `json:"-"`
+	XXX_sizecache        int32             `json:"-"`
+>>>>>>> merge with yah01/mem_replica
 }
 
 =======
@@ -1324,8 +1344,262 @@ func (x *ShardLeadersList) GetNodeAddrs() []string {
 	return nil
 }
 
+<<<<<<< HEAD
 =======
 >>>>>>> auto balance
+=======
+type GetReplicasRequest struct {
+	Base                 *commonpb.MsgBase `protobuf:"bytes,1,opt,name=base,proto3" json:"base,omitempty"`
+	CollectionID         int64             `protobuf:"varint,2,opt,name=collectionID,proto3" json:"collectionID,omitempty"`
+	WithShardNodes       bool              `protobuf:"varint,3,opt,name=with_shard_nodes,json=withShardNodes,proto3" json:"with_shard_nodes,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
+	XXX_unrecognized     []byte            `json:"-"`
+	XXX_sizecache        int32             `json:"-"`
+}
+
+func (m *GetReplicasRequest) Reset()         { *m = GetReplicasRequest{} }
+func (m *GetReplicasRequest) String() string { return proto.CompactTextString(m) }
+func (*GetReplicasRequest) ProtoMessage()    {}
+func (*GetReplicasRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_aab7cc9a69ed26e8, []int{14}
+}
+
+func (m *GetReplicasRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_GetReplicasRequest.Unmarshal(m, b)
+}
+func (m *GetReplicasRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_GetReplicasRequest.Marshal(b, m, deterministic)
+}
+func (m *GetReplicasRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GetReplicasRequest.Merge(m, src)
+}
+func (m *GetReplicasRequest) XXX_Size() int {
+	return xxx_messageInfo_GetReplicasRequest.Size(m)
+}
+func (m *GetReplicasRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_GetReplicasRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_GetReplicasRequest proto.InternalMessageInfo
+
+func (m *GetReplicasRequest) GetBase() *commonpb.MsgBase {
+	if m != nil {
+		return m.Base
+	}
+	return nil
+}
+
+func (m *GetReplicasRequest) GetCollectionID() int64 {
+	if m != nil {
+		return m.CollectionID
+	}
+	return 0
+}
+
+func (m *GetReplicasRequest) GetWithShardNodes() bool {
+	if m != nil {
+		return m.WithShardNodes
+	}
+	return false
+}
+
+type GetReplicasResponse struct {
+	Status               *commonpb.Status `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	Replicas             []*ReplicaInfo   `protobuf:"bytes,2,rep,name=replicas,proto3" json:"replicas,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}         `json:"-"`
+	XXX_unrecognized     []byte           `json:"-"`
+	XXX_sizecache        int32            `json:"-"`
+}
+
+func (m *GetReplicasResponse) Reset()         { *m = GetReplicasResponse{} }
+func (m *GetReplicasResponse) String() string { return proto.CompactTextString(m) }
+func (*GetReplicasResponse) ProtoMessage()    {}
+func (*GetReplicasResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_aab7cc9a69ed26e8, []int{15}
+}
+
+func (m *GetReplicasResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_GetReplicasResponse.Unmarshal(m, b)
+}
+func (m *GetReplicasResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_GetReplicasResponse.Marshal(b, m, deterministic)
+}
+func (m *GetReplicasResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GetReplicasResponse.Merge(m, src)
+}
+func (m *GetReplicasResponse) XXX_Size() int {
+	return xxx_messageInfo_GetReplicasResponse.Size(m)
+}
+func (m *GetReplicasResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_GetReplicasResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_GetReplicasResponse proto.InternalMessageInfo
+
+func (m *GetReplicasResponse) GetStatus() *commonpb.Status {
+	if m != nil {
+		return m.Status
+	}
+	return nil
+}
+
+func (m *GetReplicasResponse) GetReplicas() []*ReplicaInfo {
+	if m != nil {
+		return m.Replicas
+	}
+	return nil
+}
+
+type GetShardLeadersRequest struct {
+	Base                 *commonpb.MsgBase `protobuf:"bytes,1,opt,name=base,proto3" json:"base,omitempty"`
+	CollectionID         int64             `protobuf:"varint,2,opt,name=collectionID,proto3" json:"collectionID,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
+	XXX_unrecognized     []byte            `json:"-"`
+	XXX_sizecache        int32             `json:"-"`
+}
+
+func (m *GetShardLeadersRequest) Reset()         { *m = GetShardLeadersRequest{} }
+func (m *GetShardLeadersRequest) String() string { return proto.CompactTextString(m) }
+func (*GetShardLeadersRequest) ProtoMessage()    {}
+func (*GetShardLeadersRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_aab7cc9a69ed26e8, []int{16}
+}
+
+func (m *GetShardLeadersRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_GetShardLeadersRequest.Unmarshal(m, b)
+}
+func (m *GetShardLeadersRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_GetShardLeadersRequest.Marshal(b, m, deterministic)
+}
+func (m *GetShardLeadersRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GetShardLeadersRequest.Merge(m, src)
+}
+func (m *GetShardLeadersRequest) XXX_Size() int {
+	return xxx_messageInfo_GetShardLeadersRequest.Size(m)
+}
+func (m *GetShardLeadersRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_GetShardLeadersRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_GetShardLeadersRequest proto.InternalMessageInfo
+
+func (m *GetShardLeadersRequest) GetBase() *commonpb.MsgBase {
+	if m != nil {
+		return m.Base
+	}
+	return nil
+}
+
+func (m *GetShardLeadersRequest) GetCollectionID() int64 {
+	if m != nil {
+		return m.CollectionID
+	}
+	return 0
+}
+
+type GetShardLeadersResponse struct {
+	Status               *commonpb.Status    `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	Shards               []*ShardLeadersList `protobuf:"bytes,2,rep,name=shards,proto3" json:"shards,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}            `json:"-"`
+	XXX_unrecognized     []byte              `json:"-"`
+	XXX_sizecache        int32               `json:"-"`
+}
+
+func (m *GetShardLeadersResponse) Reset()         { *m = GetShardLeadersResponse{} }
+func (m *GetShardLeadersResponse) String() string { return proto.CompactTextString(m) }
+func (*GetShardLeadersResponse) ProtoMessage()    {}
+func (*GetShardLeadersResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_aab7cc9a69ed26e8, []int{17}
+}
+
+func (m *GetShardLeadersResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_GetShardLeadersResponse.Unmarshal(m, b)
+}
+func (m *GetShardLeadersResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_GetShardLeadersResponse.Marshal(b, m, deterministic)
+}
+func (m *GetShardLeadersResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GetShardLeadersResponse.Merge(m, src)
+}
+func (m *GetShardLeadersResponse) XXX_Size() int {
+	return xxx_messageInfo_GetShardLeadersResponse.Size(m)
+}
+func (m *GetShardLeadersResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_GetShardLeadersResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_GetShardLeadersResponse proto.InternalMessageInfo
+
+func (m *GetShardLeadersResponse) GetStatus() *commonpb.Status {
+	if m != nil {
+		return m.Status
+	}
+	return nil
+}
+
+func (m *GetShardLeadersResponse) GetShards() []*ShardLeadersList {
+	if m != nil {
+		return m.Shards
+	}
+	return nil
+}
+
+type ShardLeadersList struct {
+	ChannelName          string   `protobuf:"bytes,1,opt,name=channel_name,json=channelName,proto3" json:"channel_name,omitempty"`
+	NodeIds              []int64  `protobuf:"varint,2,rep,packed,name=node_ids,json=nodeIds,proto3" json:"node_ids,omitempty"`
+	NodeAddrs            []string `protobuf:"bytes,3,rep,name=node_addrs,json=nodeAddrs,proto3" json:"node_addrs,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *ShardLeadersList) Reset()         { *m = ShardLeadersList{} }
+func (m *ShardLeadersList) String() string { return proto.CompactTextString(m) }
+func (*ShardLeadersList) ProtoMessage()    {}
+func (*ShardLeadersList) Descriptor() ([]byte, []int) {
+	return fileDescriptor_aab7cc9a69ed26e8, []int{18}
+}
+
+func (m *ShardLeadersList) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_ShardLeadersList.Unmarshal(m, b)
+}
+func (m *ShardLeadersList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_ShardLeadersList.Marshal(b, m, deterministic)
+}
+func (m *ShardLeadersList) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ShardLeadersList.Merge(m, src)
+}
+func (m *ShardLeadersList) XXX_Size() int {
+	return xxx_messageInfo_ShardLeadersList.Size(m)
+}
+func (m *ShardLeadersList) XXX_DiscardUnknown() {
+	xxx_messageInfo_ShardLeadersList.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ShardLeadersList proto.InternalMessageInfo
+
+func (m *ShardLeadersList) GetChannelName() string {
+	if m != nil {
+		return m.ChannelName
+	}
+	return ""
+}
+
+func (m *ShardLeadersList) GetNodeIds() []int64 {
+	if m != nil {
+		return m.NodeIds
+	}
+	return nil
+}
+
+func (m *ShardLeadersList) GetNodeAddrs() []string {
+	if m != nil {
+		return m.NodeAddrs
+	}
+	return nil
+}
+
+>>>>>>> merge with yah01/mem_replica
 //-----------------query node grpc request and response proto----------------
 type AddQueryChannelRequest struct {
 	state         protoimpl.MessageState
@@ -1354,8 +1628,12 @@ func (m *AddQueryChannelRequest) Reset()         { *m = AddQueryChannelRequest{}
 func (m *AddQueryChannelRequest) String() string { return proto.CompactTextString(m) }
 func (*AddQueryChannelRequest) ProtoMessage()    {}
 func (*AddQueryChannelRequest) Descriptor() ([]byte, []int) {
+<<<<<<< HEAD
 	return fileDescriptor_aab7cc9a69ed26e8, []int{14}
 >>>>>>> auto balance
+=======
+	return fileDescriptor_aab7cc9a69ed26e8, []int{19}
+>>>>>>> merge with yah01/mem_replica
 }
 
 func (x *AddQueryChannelRequest) String() string {
@@ -1450,7 +1728,7 @@ func (m *RemoveQueryChannelRequest) Reset()         { *m = RemoveQueryChannelReq
 func (m *RemoveQueryChannelRequest) String() string { return proto.CompactTextString(m) }
 func (*RemoveQueryChannelRequest) ProtoMessage()    {}
 func (*RemoveQueryChannelRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aab7cc9a69ed26e8, []int{15}
+	return fileDescriptor_aab7cc9a69ed26e8, []int{20}
 }
 >>>>>>> auto balance
 
@@ -1542,8 +1820,12 @@ func (m *LoadMetaInfo) Reset()         { *m = LoadMetaInfo{} }
 func (m *LoadMetaInfo) String() string { return proto.CompactTextString(m) }
 func (*LoadMetaInfo) ProtoMessage()    {}
 func (*LoadMetaInfo) Descriptor() ([]byte, []int) {
+<<<<<<< HEAD
 	return fileDescriptor_aab7cc9a69ed26e8, []int{16}
 >>>>>>> auto balance
+=======
+	return fileDescriptor_aab7cc9a69ed26e8, []int{21}
+>>>>>>> merge with yah01/mem_replica
 }
 
 func (x *LoadMetaInfo) Reset() {
@@ -1622,7 +1904,7 @@ func (m *WatchDmChannelsRequest) Reset()         { *m = WatchDmChannelsRequest{}
 func (m *WatchDmChannelsRequest) String() string { return proto.CompactTextString(m) }
 func (*WatchDmChannelsRequest) ProtoMessage()    {}
 func (*WatchDmChannelsRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aab7cc9a69ed26e8, []int{17}
+	return fileDescriptor_aab7cc9a69ed26e8, []int{22}
 }
 >>>>>>> auto balance
 
@@ -1747,8 +2029,12 @@ func (m *WatchDeltaChannelsRequest) Reset()         { *m = WatchDeltaChannelsReq
 func (m *WatchDeltaChannelsRequest) String() string { return proto.CompactTextString(m) }
 func (*WatchDeltaChannelsRequest) ProtoMessage()    {}
 func (*WatchDeltaChannelsRequest) Descriptor() ([]byte, []int) {
+<<<<<<< HEAD
 	return fileDescriptor_aab7cc9a69ed26e8, []int{18}
 >>>>>>> auto balance
+=======
+	return fileDescriptor_aab7cc9a69ed26e8, []int{23}
+>>>>>>> merge with yah01/mem_replica
 }
 
 type WatchDeltaChannelsRequest struct {
@@ -1846,7 +2132,7 @@ type SegmentLoadInfo struct {
 	Statslogs            []*datapb.FieldBinlog `protobuf:"bytes,8,rep,name=statslogs,proto3" json:"statslogs,omitempty"`
 	Deltalogs            []*datapb.FieldBinlog `protobuf:"bytes,9,rep,name=deltalogs,proto3" json:"deltalogs,omitempty"`
 	CompactionFrom       []int64               `protobuf:"varint,10,rep,packed,name=compactionFrom,proto3" json:"compactionFrom,omitempty"`
-	IndexInfos           []*VecFieldIndexInfo  `protobuf:"bytes,11,rep,name=index_infos,json=indexInfos,proto3" json:"index_infos,omitempty"`
+	IndexInfos           []*FieldIndexInfo     `protobuf:"bytes,11,rep,name=index_infos,json=indexInfos,proto3" json:"index_infos,omitempty"`
 	SegmentSize          int64                 `protobuf:"varint,12,opt,name=segment_size,json=segmentSize,proto3" json:"segment_size,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}              `json:"-"`
 	XXX_unrecognized     []byte                `json:"-"`
@@ -1857,7 +2143,7 @@ func (m *SegmentLoadInfo) Reset()         { *m = SegmentLoadInfo{} }
 func (m *SegmentLoadInfo) String() string { return proto.CompactTextString(m) }
 func (*SegmentLoadInfo) ProtoMessage()    {}
 func (*SegmentLoadInfo) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aab7cc9a69ed26e8, []int{19}
+	return fileDescriptor_aab7cc9a69ed26e8, []int{24}
 }
 >>>>>>> auto balance
 
@@ -1978,11 +2264,15 @@ func (x *SegmentLoadInfo) GetCompactionFrom() []int64 {
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 func (x *SegmentLoadInfo) GetIndexInfos() []*FieldIndexInfo {
 	if x != nil {
 		return x.IndexInfos
 =======
 func (m *SegmentLoadInfo) GetIndexInfos() []*VecFieldIndexInfo {
+=======
+func (m *SegmentLoadInfo) GetIndexInfos() []*FieldIndexInfo {
+>>>>>>> merge with yah01/mem_replica
 	if m != nil {
 		return m.IndexInfos
 >>>>>>> auto balance
@@ -1997,6 +2287,7 @@ func (x *SegmentLoadInfo) GetSegmentSize() int64 {
 	return 0
 }
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 type FieldIndexInfo struct {
 	state         protoimpl.MessageState
@@ -2050,6 +2341,9 @@ func (x *FieldIndexInfo) GetFieldID() int64 {
 		return x.FieldID
 =======
 type VecFieldIndexInfo struct {
+=======
+type FieldIndexInfo struct {
+>>>>>>> merge with yah01/mem_replica
 	FieldID              int64                    `protobuf:"varint,1,opt,name=fieldID,proto3" json:"fieldID,omitempty"`
 	EnableIndex          bool                     `protobuf:"varint,2,opt,name=enable_index,json=enableIndex,proto3" json:"enable_index,omitempty"`
 	IndexName            string                   `protobuf:"bytes,3,opt,name=index_name,json=indexName,proto3" json:"index_name,omitempty"`
@@ -2063,32 +2357,32 @@ type VecFieldIndexInfo struct {
 	XXX_sizecache        int32                    `json:"-"`
 }
 
-func (m *VecFieldIndexInfo) Reset()         { *m = VecFieldIndexInfo{} }
-func (m *VecFieldIndexInfo) String() string { return proto.CompactTextString(m) }
-func (*VecFieldIndexInfo) ProtoMessage()    {}
-func (*VecFieldIndexInfo) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aab7cc9a69ed26e8, []int{20}
+func (m *FieldIndexInfo) Reset()         { *m = FieldIndexInfo{} }
+func (m *FieldIndexInfo) String() string { return proto.CompactTextString(m) }
+func (*FieldIndexInfo) ProtoMessage()    {}
+func (*FieldIndexInfo) Descriptor() ([]byte, []int) {
+	return fileDescriptor_aab7cc9a69ed26e8, []int{25}
 }
 
-func (m *VecFieldIndexInfo) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_VecFieldIndexInfo.Unmarshal(m, b)
+func (m *FieldIndexInfo) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_FieldIndexInfo.Unmarshal(m, b)
 }
-func (m *VecFieldIndexInfo) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_VecFieldIndexInfo.Marshal(b, m, deterministic)
+func (m *FieldIndexInfo) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_FieldIndexInfo.Marshal(b, m, deterministic)
 }
-func (m *VecFieldIndexInfo) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_VecFieldIndexInfo.Merge(m, src)
+func (m *FieldIndexInfo) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_FieldIndexInfo.Merge(m, src)
 }
-func (m *VecFieldIndexInfo) XXX_Size() int {
-	return xxx_messageInfo_VecFieldIndexInfo.Size(m)
+func (m *FieldIndexInfo) XXX_Size() int {
+	return xxx_messageInfo_FieldIndexInfo.Size(m)
 }
-func (m *VecFieldIndexInfo) XXX_DiscardUnknown() {
-	xxx_messageInfo_VecFieldIndexInfo.DiscardUnknown(m)
+func (m *FieldIndexInfo) XXX_DiscardUnknown() {
+	xxx_messageInfo_FieldIndexInfo.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_VecFieldIndexInfo proto.InternalMessageInfo
+var xxx_messageInfo_FieldIndexInfo proto.InternalMessageInfo
 
-func (m *VecFieldIndexInfo) GetFieldID() int64 {
+func (m *FieldIndexInfo) GetFieldID() int64 {
 	if m != nil {
 		return m.FieldID
 >>>>>>> auto balance
@@ -2097,11 +2391,15 @@ func (m *VecFieldIndexInfo) GetFieldID() int64 {
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 func (x *FieldIndexInfo) GetEnableIndex() bool {
 	if x != nil {
 		return x.EnableIndex
 =======
 func (m *VecFieldIndexInfo) GetEnableIndex() bool {
+=======
+func (m *FieldIndexInfo) GetEnableIndex() bool {
+>>>>>>> merge with yah01/mem_replica
 	if m != nil {
 		return m.EnableIndex
 >>>>>>> auto balance
@@ -2110,11 +2408,15 @@ func (m *VecFieldIndexInfo) GetEnableIndex() bool {
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 func (x *FieldIndexInfo) GetIndexName() string {
 	if x != nil {
 		return x.IndexName
 =======
 func (m *VecFieldIndexInfo) GetIndexName() string {
+=======
+func (m *FieldIndexInfo) GetIndexName() string {
+>>>>>>> merge with yah01/mem_replica
 	if m != nil {
 		return m.IndexName
 >>>>>>> auto balance
@@ -2123,11 +2425,15 @@ func (m *VecFieldIndexInfo) GetIndexName() string {
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 func (x *FieldIndexInfo) GetIndexID() int64 {
 	if x != nil {
 		return x.IndexID
 =======
 func (m *VecFieldIndexInfo) GetIndexID() int64 {
+=======
+func (m *FieldIndexInfo) GetIndexID() int64 {
+>>>>>>> merge with yah01/mem_replica
 	if m != nil {
 		return m.IndexID
 >>>>>>> auto balance
@@ -2136,11 +2442,15 @@ func (m *VecFieldIndexInfo) GetIndexID() int64 {
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 func (x *FieldIndexInfo) GetBuildID() int64 {
 	if x != nil {
 		return x.BuildID
 =======
 func (m *VecFieldIndexInfo) GetBuildID() int64 {
+=======
+func (m *FieldIndexInfo) GetBuildID() int64 {
+>>>>>>> merge with yah01/mem_replica
 	if m != nil {
 		return m.BuildID
 >>>>>>> auto balance
@@ -2149,11 +2459,15 @@ func (m *VecFieldIndexInfo) GetBuildID() int64 {
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 func (x *FieldIndexInfo) GetIndexParams() []*commonpb.KeyValuePair {
 	if x != nil {
 		return x.IndexParams
 =======
 func (m *VecFieldIndexInfo) GetIndexParams() []*commonpb.KeyValuePair {
+=======
+func (m *FieldIndexInfo) GetIndexParams() []*commonpb.KeyValuePair {
+>>>>>>> merge with yah01/mem_replica
 	if m != nil {
 		return m.IndexParams
 >>>>>>> auto balance
@@ -2162,11 +2476,15 @@ func (m *VecFieldIndexInfo) GetIndexParams() []*commonpb.KeyValuePair {
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 func (x *FieldIndexInfo) GetIndexFilePaths() []string {
 	if x != nil {
 		return x.IndexFilePaths
 =======
 func (m *VecFieldIndexInfo) GetIndexFilePaths() []string {
+=======
+func (m *FieldIndexInfo) GetIndexFilePaths() []string {
+>>>>>>> merge with yah01/mem_replica
 	if m != nil {
 		return m.IndexFilePaths
 >>>>>>> auto balance
@@ -2175,11 +2493,15 @@ func (m *VecFieldIndexInfo) GetIndexFilePaths() []string {
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 func (x *FieldIndexInfo) GetIndexSize() int64 {
 	if x != nil {
 		return x.IndexSize
 =======
 func (m *VecFieldIndexInfo) GetIndexSize() int64 {
+=======
+func (m *FieldIndexInfo) GetIndexSize() int64 {
+>>>>>>> merge with yah01/mem_replica
 	if m != nil {
 		return m.IndexSize
 >>>>>>> auto balance
@@ -2209,7 +2531,7 @@ func (m *LoadSegmentsRequest) Reset()         { *m = LoadSegmentsRequest{} }
 func (m *LoadSegmentsRequest) String() string { return proto.CompactTextString(m) }
 func (*LoadSegmentsRequest) ProtoMessage()    {}
 func (*LoadSegmentsRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aab7cc9a69ed26e8, []int{21}
+	return fileDescriptor_aab7cc9a69ed26e8, []int{26}
 }
 >>>>>>> auto balance
 
@@ -2330,8 +2652,12 @@ func (m *ReleaseSegmentsRequest) Reset()         { *m = ReleaseSegmentsRequest{}
 func (m *ReleaseSegmentsRequest) String() string { return proto.CompactTextString(m) }
 func (*ReleaseSegmentsRequest) ProtoMessage()    {}
 func (*ReleaseSegmentsRequest) Descriptor() ([]byte, []int) {
+<<<<<<< HEAD
 	return fileDescriptor_aab7cc9a69ed26e8, []int{22}
 >>>>>>> auto balance
+=======
+	return fileDescriptor_aab7cc9a69ed26e8, []int{27}
+>>>>>>> merge with yah01/mem_replica
 }
 
 func (x *ReleaseSegmentsRequest) Reset() {
@@ -2409,6 +2735,7 @@ func (x *ReleaseSegmentsRequest) GetSegmentIDs() []int64 {
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 type SearchRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -2454,25 +2781,77 @@ func (*SearchRequest) Descriptor() ([]byte, []int) {
 func (x *SearchRequest) GetReq() *internalpb.SearchRequest {
 	if x != nil {
 		return x.Req
+=======
+type SearchRequest struct {
+	Req                  *milvuspb.SearchRequest `protobuf:"bytes,1,opt,name=req,proto3" json:"req,omitempty"`
+	DmlChannel           string                  `protobuf:"bytes,2,opt,name=dml_channel,json=dmlChannel,proto3" json:"dml_channel,omitempty"`
+	SegmentIDs           []int64                 `protobuf:"varint,3,rep,packed,name=segmentIDs,proto3" json:"segmentIDs,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}                `json:"-"`
+	XXX_unrecognized     []byte                  `json:"-"`
+	XXX_sizecache        int32                   `json:"-"`
+}
+
+func (m *SearchRequest) Reset()         { *m = SearchRequest{} }
+func (m *SearchRequest) String() string { return proto.CompactTextString(m) }
+func (*SearchRequest) ProtoMessage()    {}
+func (*SearchRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_aab7cc9a69ed26e8, []int{28}
+}
+
+func (m *SearchRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_SearchRequest.Unmarshal(m, b)
+}
+func (m *SearchRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_SearchRequest.Marshal(b, m, deterministic)
+}
+func (m *SearchRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_SearchRequest.Merge(m, src)
+}
+func (m *SearchRequest) XXX_Size() int {
+	return xxx_messageInfo_SearchRequest.Size(m)
+}
+func (m *SearchRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_SearchRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_SearchRequest proto.InternalMessageInfo
+
+func (m *SearchRequest) GetReq() *milvuspb.SearchRequest {
+	if m != nil {
+		return m.Req
+>>>>>>> merge with yah01/mem_replica
 	}
 	return nil
 }
 
+<<<<<<< HEAD
 func (x *SearchRequest) GetDmlChannel() string {
 	if x != nil {
 		return x.DmlChannel
+=======
+func (m *SearchRequest) GetDmlChannel() string {
+	if m != nil {
+		return m.DmlChannel
+>>>>>>> merge with yah01/mem_replica
 	}
 	return ""
 }
 
+<<<<<<< HEAD
 func (x *SearchRequest) GetSegmentIDs() []int64 {
 	if x != nil {
 		return x.SegmentIDs
+=======
+func (m *SearchRequest) GetSegmentIDs() []int64 {
+	if m != nil {
+		return m.SegmentIDs
+>>>>>>> merge with yah01/mem_replica
 	}
 	return nil
 }
 
 type QueryRequest struct {
+<<<<<<< HEAD
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
@@ -2493,6 +2872,69 @@ func (x *QueryRequest) Reset() {
 
 func (x *QueryRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
+=======
+	Req                  *milvuspb.QueryRequest `protobuf:"bytes,1,opt,name=req,proto3" json:"req,omitempty"`
+	DmlChannel           string                 `protobuf:"bytes,2,opt,name=dml_channel,json=dmlChannel,proto3" json:"dml_channel,omitempty"`
+	SegmentIDs           []int64                `protobuf:"varint,3,rep,packed,name=segmentIDs,proto3" json:"segmentIDs,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}               `json:"-"`
+	XXX_unrecognized     []byte                 `json:"-"`
+	XXX_sizecache        int32                  `json:"-"`
+}
+
+func (m *QueryRequest) Reset()         { *m = QueryRequest{} }
+func (m *QueryRequest) String() string { return proto.CompactTextString(m) }
+func (*QueryRequest) ProtoMessage()    {}
+func (*QueryRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_aab7cc9a69ed26e8, []int{29}
+}
+
+func (m *QueryRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_QueryRequest.Unmarshal(m, b)
+}
+func (m *QueryRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_QueryRequest.Marshal(b, m, deterministic)
+}
+func (m *QueryRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_QueryRequest.Merge(m, src)
+}
+func (m *QueryRequest) XXX_Size() int {
+	return xxx_messageInfo_QueryRequest.Size(m)
+}
+func (m *QueryRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_QueryRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_QueryRequest proto.InternalMessageInfo
+
+func (m *QueryRequest) GetReq() *milvuspb.QueryRequest {
+	if m != nil {
+		return m.Req
+	}
+	return nil
+}
+
+func (m *QueryRequest) GetDmlChannel() string {
+	if m != nil {
+		return m.DmlChannel
+	}
+	return ""
+}
+
+func (m *QueryRequest) GetSegmentIDs() []int64 {
+	if m != nil {
+		return m.SegmentIDs
+	}
+	return nil
+}
+
+//----------------request auto triggered by QueryCoord-----------------
+type HandoffSegmentsRequest struct {
+	Base                 *commonpb.MsgBase `protobuf:"bytes,1,opt,name=base,proto3" json:"base,omitempty"`
+	SegmentInfos         []*SegmentInfo    `protobuf:"bytes,2,rep,name=segmentInfos,proto3" json:"segmentInfos,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
+	XXX_unrecognized     []byte            `json:"-"`
+	XXX_sizecache        int32             `json:"-"`
+>>>>>>> merge with yah01/mem_replica
 }
 
 func (*QueryRequest) ProtoMessage() {}
@@ -2551,8 +2993,12 @@ func (m *HandoffSegmentsRequest) Reset()         { *m = HandoffSegmentsRequest{}
 func (m *HandoffSegmentsRequest) String() string { return proto.CompactTextString(m) }
 func (*HandoffSegmentsRequest) ProtoMessage()    {}
 func (*HandoffSegmentsRequest) Descriptor() ([]byte, []int) {
+<<<<<<< HEAD
 	return fileDescriptor_aab7cc9a69ed26e8, []int{23}
 >>>>>>> auto balance
+=======
+	return fileDescriptor_aab7cc9a69ed26e8, []int{30}
+>>>>>>> merge with yah01/mem_replica
 }
 
 func (x *HandoffSegmentsRequest) Reset() {
@@ -2622,7 +3068,7 @@ func (m *LoadBalanceRequest) Reset()         { *m = LoadBalanceRequest{} }
 func (m *LoadBalanceRequest) String() string { return proto.CompactTextString(m) }
 func (*LoadBalanceRequest) ProtoMessage()    {}
 func (*LoadBalanceRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aab7cc9a69ed26e8, []int{24}
+	return fileDescriptor_aab7cc9a69ed26e8, []int{31}
 }
 >>>>>>> auto balance
 
@@ -2721,8 +3167,12 @@ func (m *DmChannelWatchInfo) Reset()         { *m = DmChannelWatchInfo{} }
 func (m *DmChannelWatchInfo) String() string { return proto.CompactTextString(m) }
 func (*DmChannelWatchInfo) ProtoMessage()    {}
 func (*DmChannelWatchInfo) Descriptor() ([]byte, []int) {
+<<<<<<< HEAD
 	return fileDescriptor_aab7cc9a69ed26e8, []int{25}
 >>>>>>> auto balance
+=======
+	return fileDescriptor_aab7cc9a69ed26e8, []int{32}
+>>>>>>> merge with yah01/mem_replica
 }
 
 func (x *DmChannelWatchInfo) Reset() {
@@ -2803,8 +3253,12 @@ func (m *QueryChannelInfo) Reset()         { *m = QueryChannelInfo{} }
 func (m *QueryChannelInfo) String() string { return proto.CompactTextString(m) }
 func (*QueryChannelInfo) ProtoMessage()    {}
 func (*QueryChannelInfo) Descriptor() ([]byte, []int) {
+<<<<<<< HEAD
 	return fileDescriptor_aab7cc9a69ed26e8, []int{26}
 >>>>>>> auto balance
+=======
+	return fileDescriptor_aab7cc9a69ed26e8, []int{33}
+>>>>>>> merge with yah01/mem_replica
 }
 
 func (x *QueryChannelInfo) String() string {
@@ -2879,8 +3333,12 @@ func (m *PartitionStates) Reset()         { *m = PartitionStates{} }
 func (m *PartitionStates) String() string { return proto.CompactTextString(m) }
 func (*PartitionStates) ProtoMessage()    {}
 func (*PartitionStates) Descriptor() ([]byte, []int) {
+<<<<<<< HEAD
 	return fileDescriptor_aab7cc9a69ed26e8, []int{27}
 >>>>>>> auto balance
+=======
+	return fileDescriptor_aab7cc9a69ed26e8, []int{34}
+>>>>>>> merge with yah01/mem_replica
 }
 
 func (x *PartitionStates) Reset() {
@@ -2954,7 +3412,7 @@ type SegmentInfo struct {
 	CompactionFrom       []int64               `protobuf:"varint,10,rep,packed,name=compactionFrom,proto3" json:"compactionFrom,omitempty"`
 	CreatedByCompaction  bool                  `protobuf:"varint,11,opt,name=createdByCompaction,proto3" json:"createdByCompaction,omitempty"`
 	SegmentState         commonpb.SegmentState `protobuf:"varint,12,opt,name=segment_state,json=segmentState,proto3,enum=milvus.proto.common.SegmentState" json:"segment_state,omitempty"`
-	IndexInfos           []*VecFieldIndexInfo  `protobuf:"bytes,13,rep,name=index_infos,json=indexInfos,proto3" json:"index_infos,omitempty"`
+	IndexInfos           []*FieldIndexInfo     `protobuf:"bytes,13,rep,name=index_infos,json=indexInfos,proto3" json:"index_infos,omitempty"`
 	ReplicaIds           []int64               `protobuf:"varint,14,rep,packed,name=replica_ids,json=replicaIds,proto3" json:"replica_ids,omitempty"`
 	NodeIds              []int64               `protobuf:"varint,15,rep,packed,name=node_ids,json=nodeIds,proto3" json:"node_ids,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}              `json:"-"`
@@ -2966,7 +3424,7 @@ func (m *SegmentInfo) Reset()         { *m = SegmentInfo{} }
 func (m *SegmentInfo) String() string { return proto.CompactTextString(m) }
 func (*SegmentInfo) ProtoMessage()    {}
 func (*SegmentInfo) Descriptor() ([]byte, []int) {
-	return fileDescriptor_aab7cc9a69ed26e8, []int{28}
+	return fileDescriptor_aab7cc9a69ed26e8, []int{35}
 }
 >>>>>>> auto balance
 
@@ -3104,11 +3562,15 @@ func (x *SegmentInfo) GetSegmentState() commonpb.SegmentState {
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 func (x *SegmentInfo) GetIndexInfos() []*FieldIndexInfo {
 	if x != nil {
 		return x.IndexInfos
 =======
 func (m *SegmentInfo) GetIndexInfos() []*VecFieldIndexInfo {
+=======
+func (m *SegmentInfo) GetIndexInfos() []*FieldIndexInfo {
+>>>>>>> merge with yah01/mem_replica
 	if m != nil {
 		return m.IndexInfos
 >>>>>>> auto balance
@@ -3144,6 +3606,7 @@ type CollectionInfo struct {
 	InMemoryPercentage   int64                      `protobuf:"varint,7,opt,name=inMemory_percentage,json=inMemoryPercentage,proto3" json:"inMemory_percentage,omitempty"`
 	ReplicaIds           []int64                    `protobuf:"varint,8,rep,packed,name=replica_ids,json=replicaIds,proto3" json:"replica_ids,omitempty"`
 <<<<<<< HEAD
+<<<<<<< HEAD
 	ReplicaNumber        int32                      `protobuf:"varint,9,opt,name=replica_number,json=replicaNumber,proto3" json:"replica_number,omitempty"`
 }
 
@@ -3155,6 +3618,9 @@ func (x *CollectionInfo) Reset() {
 		ms.StoreMessageInfo(mi)
 	}
 =======
+=======
+	ReplicaNumber        int32                      `protobuf:"varint,9,opt,name=replica_number,json=replicaNumber,proto3" json:"replica_number,omitempty"`
+>>>>>>> merge with yah01/mem_replica
 	XXX_NoUnkeyedLiteral struct{}                   `json:"-"`
 	XXX_unrecognized     []byte                     `json:"-"`
 	XXX_sizecache        int32                      `json:"-"`
@@ -3164,8 +3630,12 @@ func (m *CollectionInfo) Reset()         { *m = CollectionInfo{} }
 func (m *CollectionInfo) String() string { return proto.CompactTextString(m) }
 func (*CollectionInfo) ProtoMessage()    {}
 func (*CollectionInfo) Descriptor() ([]byte, []int) {
+<<<<<<< HEAD
 	return fileDescriptor_aab7cc9a69ed26e8, []int{29}
 >>>>>>> auto balance
+=======
+	return fileDescriptor_aab7cc9a69ed26e8, []int{36}
+>>>>>>> merge with yah01/mem_replica
 }
 
 func (x *CollectionInfo) String() string {
@@ -3310,6 +3780,7 @@ func (x *UnsubscribeChannels) GetChannels() []string {
 	return nil
 }
 
+<<<<<<< HEAD
 type UnsubscribeChannelInfo struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -3353,12 +3824,169 @@ type UnsubscribeChannels struct {
 	XXX_sizecache        int32    `json:"-"`
 }
 
+=======
+func (m *CollectionInfo) GetReplicaNumber() int32 {
+	if m != nil {
+		return m.ReplicaNumber
+	}
+	return 0
+}
+
+type ReplicaInfo struct {
+	ReplicaID            int64           `protobuf:"varint,1,opt,name=replicaID,proto3" json:"replicaID,omitempty"`
+	CollectionID         int64           `protobuf:"varint,2,opt,name=collectionID,proto3" json:"collectionID,omitempty"`
+	PartitionIds         []int64         `protobuf:"varint,3,rep,packed,name=partition_ids,json=partitionIds,proto3" json:"partition_ids,omitempty"`
+	ShardReplicas        []*ShardReplica `protobuf:"bytes,4,rep,name=shard_replicas,json=shardReplicas,proto3" json:"shard_replicas,omitempty"`
+	NodeIds              []int64         `protobuf:"varint,5,rep,packed,name=node_ids,json=nodeIds,proto3" json:"node_ids,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}        `json:"-"`
+	XXX_unrecognized     []byte          `json:"-"`
+	XXX_sizecache        int32           `json:"-"`
+}
+
+func (m *ReplicaInfo) Reset()         { *m = ReplicaInfo{} }
+func (m *ReplicaInfo) String() string { return proto.CompactTextString(m) }
+func (*ReplicaInfo) ProtoMessage()    {}
+func (*ReplicaInfo) Descriptor() ([]byte, []int) {
+	return fileDescriptor_aab7cc9a69ed26e8, []int{37}
+}
+
+func (m *ReplicaInfo) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_ReplicaInfo.Unmarshal(m, b)
+}
+func (m *ReplicaInfo) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_ReplicaInfo.Marshal(b, m, deterministic)
+}
+func (m *ReplicaInfo) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ReplicaInfo.Merge(m, src)
+}
+func (m *ReplicaInfo) XXX_Size() int {
+	return xxx_messageInfo_ReplicaInfo.Size(m)
+}
+func (m *ReplicaInfo) XXX_DiscardUnknown() {
+	xxx_messageInfo_ReplicaInfo.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ReplicaInfo proto.InternalMessageInfo
+
+func (m *ReplicaInfo) GetReplicaID() int64 {
+	if m != nil {
+		return m.ReplicaID
+	}
+	return 0
+}
+
+func (m *ReplicaInfo) GetCollectionID() int64 {
+	if m != nil {
+		return m.CollectionID
+	}
+	return 0
+}
+
+func (m *ReplicaInfo) GetPartitionIds() []int64 {
+	if m != nil {
+		return m.PartitionIds
+	}
+	return nil
+}
+
+func (m *ReplicaInfo) GetShardReplicas() []*ShardReplica {
+	if m != nil {
+		return m.ShardReplicas
+	}
+	return nil
+}
+
+func (m *ReplicaInfo) GetNodeIds() []int64 {
+	if m != nil {
+		return m.NodeIds
+	}
+	return nil
+}
+
+type ShardReplica struct {
+	LeaderID      int64  `protobuf:"varint,1,opt,name=leaderID,proto3" json:"leaderID,omitempty"`
+	LeaderAddr    string `protobuf:"bytes,2,opt,name=leader_addr,json=leaderAddr,proto3" json:"leader_addr,omitempty"`
+	DmChannelName string `protobuf:"bytes,3,opt,name=dm_channel_name,json=dmChannelName,proto3" json:"dm_channel_name,omitempty"`
+	// optional, DO NOT save it in meta, set it only for GetReplicas()
+	// if with_shard_nodes is true
+	NodeIds              []int64  `protobuf:"varint,4,rep,packed,name=node_ids,json=nodeIds,proto3" json:"node_ids,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *ShardReplica) Reset()         { *m = ShardReplica{} }
+func (m *ShardReplica) String() string { return proto.CompactTextString(m) }
+func (*ShardReplica) ProtoMessage()    {}
+func (*ShardReplica) Descriptor() ([]byte, []int) {
+	return fileDescriptor_aab7cc9a69ed26e8, []int{38}
+}
+
+func (m *ShardReplica) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_ShardReplica.Unmarshal(m, b)
+}
+func (m *ShardReplica) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_ShardReplica.Marshal(b, m, deterministic)
+}
+func (m *ShardReplica) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ShardReplica.Merge(m, src)
+}
+func (m *ShardReplica) XXX_Size() int {
+	return xxx_messageInfo_ShardReplica.Size(m)
+}
+func (m *ShardReplica) XXX_DiscardUnknown() {
+	xxx_messageInfo_ShardReplica.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ShardReplica proto.InternalMessageInfo
+
+func (m *ShardReplica) GetLeaderID() int64 {
+	if m != nil {
+		return m.LeaderID
+	}
+	return 0
+}
+
+func (m *ShardReplica) GetLeaderAddr() string {
+	if m != nil {
+		return m.LeaderAddr
+	}
+	return ""
+}
+
+func (m *ShardReplica) GetDmChannelName() string {
+	if m != nil {
+		return m.DmChannelName
+	}
+	return ""
+}
+
+func (m *ShardReplica) GetNodeIds() []int64 {
+	if m != nil {
+		return m.NodeIds
+	}
+	return nil
+}
+
+type UnsubscribeChannels struct {
+	CollectionID         int64    `protobuf:"varint,1,opt,name=collectionID,proto3" json:"collectionID,omitempty"`
+	Channels             []string `protobuf:"bytes,2,rep,name=channels,proto3" json:"channels,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+>>>>>>> merge with yah01/mem_replica
 func (m *UnsubscribeChannels) Reset()         { *m = UnsubscribeChannels{} }
 func (m *UnsubscribeChannels) String() string { return proto.CompactTextString(m) }
 func (*UnsubscribeChannels) ProtoMessage()    {}
 func (*UnsubscribeChannels) Descriptor() ([]byte, []int) {
+<<<<<<< HEAD
 	return fileDescriptor_aab7cc9a69ed26e8, []int{30}
 >>>>>>> auto balance
+=======
+	return fileDescriptor_aab7cc9a69ed26e8, []int{39}
+>>>>>>> merge with yah01/mem_replica
 }
 
 // Deprecated: Use UnsubscribeChannelInfo.ProtoReflect.Descriptor instead.
@@ -3396,8 +4024,12 @@ func (m *UnsubscribeChannelInfo) Reset()         { *m = UnsubscribeChannelInfo{}
 func (m *UnsubscribeChannelInfo) String() string { return proto.CompactTextString(m) }
 func (*UnsubscribeChannelInfo) ProtoMessage()    {}
 func (*UnsubscribeChannelInfo) Descriptor() ([]byte, []int) {
+<<<<<<< HEAD
 	return fileDescriptor_aab7cc9a69ed26e8, []int{31}
 >>>>>>> auto balance
+=======
+	return fileDescriptor_aab7cc9a69ed26e8, []int{40}
+>>>>>>> merge with yah01/mem_replica
 }
 
 func (x *SegmentChangeInfo) Reset() {
@@ -3430,9 +4062,13 @@ func (x *SegmentChangeInfo) ProtoReflect() protoreflect.Message {
 // Deprecated: Use SegmentChangeInfo.ProtoReflect.Descriptor instead.
 func (*SegmentChangeInfo) Descriptor() ([]byte, []int) {
 <<<<<<< HEAD
+<<<<<<< HEAD
 	return file_query_coord_proto_rawDescGZIP(), []int{37}
 =======
 	return fileDescriptor_aab7cc9a69ed26e8, []int{32}
+=======
+	return fileDescriptor_aab7cc9a69ed26e8, []int{41}
+>>>>>>> merge with yah01/mem_replica
 }
 
 func (m *SegmentChangeInfo) XXX_Unmarshal(b []byte) error {
@@ -3490,8 +4126,12 @@ func (m *SealedSegmentsChangeInfo) Reset()         { *m = SealedSegmentsChangeIn
 func (m *SealedSegmentsChangeInfo) String() string { return proto.CompactTextString(m) }
 func (*SealedSegmentsChangeInfo) ProtoMessage()    {}
 func (*SealedSegmentsChangeInfo) Descriptor() ([]byte, []int) {
+<<<<<<< HEAD
 	return fileDescriptor_aab7cc9a69ed26e8, []int{33}
 >>>>>>> auto balance
+=======
+	return fileDescriptor_aab7cc9a69ed26e8, []int{42}
+>>>>>>> merge with yah01/mem_replica
 }
 
 func (x *SealedSegmentsChangeInfo) Reset() {
@@ -3540,6 +4180,7 @@ func (x *SealedSegmentsChangeInfo) GetInfos() []*SegmentChangeInfo {
 	return nil
 }
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 var File_query_coord_proto protoreflect.FileDescriptor
 
@@ -5137,6 +5778,8 @@ func (m *ShardReplica) GetDmChannelName() string {
 	return ""
 }
 
+=======
+>>>>>>> merge with yah01/mem_replica
 func init() {
 	proto.RegisterEnum("milvus.proto.query.PartitionState", PartitionState_name, PartitionState_value)
 	proto.RegisterEnum("milvus.proto.query.TriggerCondition", TriggerCondition_name, TriggerCondition_value)
@@ -5155,15 +5798,22 @@ func init() {
 	proto.RegisterType((*GetPartitionStatesResponse)(nil), "milvus.proto.query.GetPartitionStatesResponse")
 	proto.RegisterType((*GetSegmentInfoRequest)(nil), "milvus.proto.query.GetSegmentInfoRequest")
 	proto.RegisterType((*GetSegmentInfoResponse)(nil), "milvus.proto.query.GetSegmentInfoResponse")
+	proto.RegisterType((*GetReplicasRequest)(nil), "milvus.proto.query.GetReplicasRequest")
+	proto.RegisterType((*GetReplicasResponse)(nil), "milvus.proto.query.GetReplicasResponse")
+	proto.RegisterType((*GetShardLeadersRequest)(nil), "milvus.proto.query.GetShardLeadersRequest")
+	proto.RegisterType((*GetShardLeadersResponse)(nil), "milvus.proto.query.GetShardLeadersResponse")
+	proto.RegisterType((*ShardLeadersList)(nil), "milvus.proto.query.ShardLeadersList")
 	proto.RegisterType((*AddQueryChannelRequest)(nil), "milvus.proto.query.AddQueryChannelRequest")
 	proto.RegisterType((*RemoveQueryChannelRequest)(nil), "milvus.proto.query.RemoveQueryChannelRequest")
 	proto.RegisterType((*LoadMetaInfo)(nil), "milvus.proto.query.LoadMetaInfo")
 	proto.RegisterType((*WatchDmChannelsRequest)(nil), "milvus.proto.query.WatchDmChannelsRequest")
 	proto.RegisterType((*WatchDeltaChannelsRequest)(nil), "milvus.proto.query.WatchDeltaChannelsRequest")
 	proto.RegisterType((*SegmentLoadInfo)(nil), "milvus.proto.query.SegmentLoadInfo")
-	proto.RegisterType((*VecFieldIndexInfo)(nil), "milvus.proto.query.VecFieldIndexInfo")
+	proto.RegisterType((*FieldIndexInfo)(nil), "milvus.proto.query.FieldIndexInfo")
 	proto.RegisterType((*LoadSegmentsRequest)(nil), "milvus.proto.query.LoadSegmentsRequest")
 	proto.RegisterType((*ReleaseSegmentsRequest)(nil), "milvus.proto.query.ReleaseSegmentsRequest")
+	proto.RegisterType((*SearchRequest)(nil), "milvus.proto.query.SearchRequest")
+	proto.RegisterType((*QueryRequest)(nil), "milvus.proto.query.QueryRequest")
 	proto.RegisterType((*HandoffSegmentsRequest)(nil), "milvus.proto.query.HandoffSegmentsRequest")
 	proto.RegisterType((*LoadBalanceRequest)(nil), "milvus.proto.query.LoadBalanceRequest")
 	proto.RegisterType((*DmChannelWatchInfo)(nil), "milvus.proto.query.DmChannelWatchInfo")
@@ -5171,17 +5821,18 @@ func init() {
 	proto.RegisterType((*PartitionStates)(nil), "milvus.proto.query.PartitionStates")
 	proto.RegisterType((*SegmentInfo)(nil), "milvus.proto.query.SegmentInfo")
 	proto.RegisterType((*CollectionInfo)(nil), "milvus.proto.query.CollectionInfo")
+	proto.RegisterType((*ReplicaInfo)(nil), "milvus.proto.query.ReplicaInfo")
+	proto.RegisterType((*ShardReplica)(nil), "milvus.proto.query.ShardReplica")
 	proto.RegisterType((*UnsubscribeChannels)(nil), "milvus.proto.query.UnsubscribeChannels")
 	proto.RegisterType((*UnsubscribeChannelInfo)(nil), "milvus.proto.query.UnsubscribeChannelInfo")
 	proto.RegisterType((*SegmentChangeInfo)(nil), "milvus.proto.query.SegmentChangeInfo")
 	proto.RegisterType((*SealedSegmentsChangeInfo)(nil), "milvus.proto.query.SealedSegmentsChangeInfo")
-	proto.RegisterType((*ReplicaInfo)(nil), "milvus.proto.query.ReplicaInfo")
-	proto.RegisterType((*ShardReplica)(nil), "milvus.proto.query.ShardReplica")
 }
 
 func init() { proto.RegisterFile("query_coord.proto", fileDescriptor_aab7cc9a69ed26e8) }
 
 var fileDescriptor_aab7cc9a69ed26e8 = []byte{
+<<<<<<< HEAD
 	// 2563 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xec, 0x3a, 0xcd, 0x6f, 0x1c, 0x49,
 	0xf5, 0xee, 0xf9, 0xb0, 0x3d, 0x6f, 0x3e, 0x5d, 0x4e, 0xfc, 0x9b, 0xcc, 0x6f, 0x37, 0xf1, 0x76,
@@ -5345,6 +5996,189 @@ var fileDescriptor_aab7cc9a69ed26e8 = []byte{
 	0x7e, 0x7f, 0x9e, 0x2d, 0xef, 0xfc, 0x27, 0x00, 0x00, 0xff, 0xff, 0xba, 0x6a, 0xe4, 0x72, 0xc4,
 	0x2c, 0x00, 0x00,
 >>>>>>> auto balance
+=======
+	// 2870 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xec, 0x3a, 0x4b, 0x6f, 0x1c, 0x59,
+	0xd5, 0xae, 0x7e, 0xb9, 0xfb, 0xf4, 0x33, 0xd7, 0x89, 0xa7, 0xdd, 0xdf, 0x3c, 0x9c, 0xca, 0xe4,
+	0xf1, 0x65, 0x18, 0x27, 0x38, 0x83, 0xc4, 0x68, 0x60, 0x11, 0xdb, 0xc4, 0x63, 0x26, 0xf1, 0x78,
+	0xca, 0x4e, 0x80, 0x28, 0x52, 0x4d, 0x75, 0xd7, 0x75, 0xbb, 0x94, 0x7a, 0x74, 0xea, 0x56, 0x8f,
+	0xe3, 0xb0, 0x1d, 0x81, 0x78, 0x0b, 0x09, 0xc4, 0x06, 0xb1, 0x02, 0x01, 0x12, 0x23, 0xd6, 0xec,
+	0xf8, 0x01, 0x2c, 0x58, 0xb2, 0x42, 0xec, 0xe0, 0x0f, 0xb0, 0x44, 0xa0, 0xfb, 0xa8, 0xea, 0x7a,
+	0xdc, 0xb2, 0xdb, 0xf6, 0x78, 0x12, 0x21, 0x76, 0x75, 0x4f, 0x9d, 0x7b, 0xcf, 0xb9, 0xe7, 0x9c,
+	0x7b, 0x5e, 0xf7, 0xc2, 0xb9, 0x27, 0x63, 0xec, 0x1f, 0xe8, 0x03, 0xcf, 0xf3, 0xcd, 0xa5, 0x91,
+	0xef, 0x05, 0x1e, 0x42, 0x8e, 0x65, 0x7f, 0x34, 0x26, 0x7c, 0xb4, 0xc4, 0xfe, 0xf7, 0x1a, 0x03,
+	0xcf, 0x71, 0x3c, 0x97, 0xc3, 0x7a, 0x8d, 0x38, 0x46, 0xaf, 0x65, 0xb9, 0x01, 0xf6, 0x5d, 0xc3,
+	0x0e, 0xff, 0x92, 0xc1, 0x1e, 0x76, 0x0c, 0x31, 0xea, 0x98, 0x46, 0x60, 0xc4, 0xd7, 0x57, 0x3f,
+	0x56, 0x60, 0x7e, 0x7b, 0xcf, 0xdb, 0x5f, 0xf5, 0x6c, 0x1b, 0x0f, 0x02, 0xcb, 0x73, 0x89, 0x86,
+	0x9f, 0x8c, 0x31, 0x09, 0xd0, 0x4d, 0x28, 0xf5, 0x0d, 0x82, 0xbb, 0xca, 0xa2, 0x72, 0xad, 0xbe,
+	0xfc, 0xf2, 0x52, 0x82, 0x13, 0xc1, 0xc2, 0x3d, 0x32, 0x5c, 0x31, 0x08, 0xd6, 0x18, 0x26, 0x42,
+	0x50, 0x32, 0xfb, 0x1b, 0x6b, 0xdd, 0xc2, 0xa2, 0x72, 0xad, 0xa8, 0xb1, 0x6f, 0xf4, 0x3a, 0x34,
+	0x07, 0xd1, 0xda, 0x1b, 0x6b, 0xa4, 0x5b, 0x5c, 0x2c, 0x5e, 0x2b, 0x6a, 0x49, 0xa0, 0xfa, 0x6b,
+	0x05, 0x5e, 0xca, 0xb0, 0x41, 0x46, 0x9e, 0x4b, 0x30, 0xba, 0x05, 0x15, 0x12, 0x18, 0xc1, 0x98,
+	0x08, 0x4e, 0xfe, 0x4f, 0xca, 0xc9, 0x36, 0x43, 0xd1, 0x04, 0x6a, 0x96, 0x6c, 0x41, 0x42, 0x16,
+	0x7d, 0x1e, 0xce, 0x5b, 0xee, 0x3d, 0xec, 0x78, 0xfe, 0x81, 0x3e, 0xc2, 0xfe, 0x00, 0xbb, 0x81,
+	0x31, 0xc4, 0x21, 0x8f, 0x73, 0xe1, 0xbf, 0xad, 0xc9, 0x2f, 0xf5, 0x57, 0x0a, 0x5c, 0xa0, 0x9c,
+	0x6e, 0x19, 0x7e, 0x60, 0x9d, 0x81, 0xbc, 0x54, 0x68, 0xc4, 0x79, 0xec, 0x16, 0xd9, 0xbf, 0x04,
+	0x8c, 0xe2, 0x8c, 0x42, 0xf2, 0x74, 0x6f, 0x25, 0xc6, 0x6e, 0x02, 0xa6, 0xfe, 0x52, 0x28, 0x36,
+	0xce, 0xe7, 0x69, 0x04, 0x9a, 0xa6, 0x59, 0xc8, 0xd2, 0x3c, 0x89, 0x38, 0xff, 0xae, 0xc0, 0x85,
+	0xbb, 0x9e, 0x61, 0x4e, 0x14, 0xff, 0xd9, 0x8b, 0xf3, 0xcb, 0x50, 0xe1, 0xa7, 0xa4, 0x5b, 0x62,
+	0xb4, 0x2e, 0x27, 0x69, 0x89, 0x13, 0x34, 0xe1, 0x70, 0x9b, 0x01, 0x34, 0x31, 0x09, 0x5d, 0x86,
+	0x96, 0x8f, 0x47, 0xb6, 0x35, 0x30, 0x74, 0x77, 0xec, 0xf4, 0xb1, 0xdf, 0x2d, 0x2f, 0x2a, 0xd7,
+	0xca, 0x5a, 0x53, 0x40, 0x37, 0x19, 0x50, 0xfd, 0xb9, 0x02, 0x5d, 0x0d, 0xdb, 0xd8, 0x20, 0xf8,
+	0x79, 0x6e, 0x76, 0x1e, 0x2a, 0xae, 0x67, 0xe2, 0x8d, 0x35, 0xb6, 0xd9, 0xa2, 0x26, 0x46, 0xea,
+	0xf7, 0x0a, 0x5c, 0x11, 0x2f, 0xb8, 0x5d, 0xc7, 0x94, 0x55, 0xfe, 0x74, 0x94, 0x55, 0x91, 0x29,
+	0xeb, 0x8f, 0x13, 0x65, 0xbd, 0xe8, 0x02, 0x99, 0x28, 0xb4, 0x9c, 0x50, 0xe8, 0x37, 0x60, 0x61,
+	0xd5, 0xc7, 0x46, 0x80, 0x3f, 0xa0, 0x41, 0x63, 0x75, 0xcf, 0x70, 0x5d, 0x6c, 0x87, 0x5b, 0x48,
+	0x13, 0x57, 0x24, 0xc4, 0xbb, 0x30, 0x3b, 0xf2, 0xbd, 0xa7, 0x07, 0x11, 0xdf, 0xe1, 0x50, 0xfd,
+	0x8d, 0x02, 0x3d, 0xd9, 0xda, 0xa7, 0xf1, 0x2f, 0x97, 0xa0, 0x29, 0xa2, 0x1f, 0x5f, 0x8d, 0xd1,
+	0xac, 0x69, 0x8d, 0x27, 0x31, 0x0a, 0xe8, 0x26, 0x9c, 0xe7, 0x48, 0x3e, 0x26, 0x63, 0x3b, 0x88,
+	0x70, 0x8b, 0x0c, 0x17, 0xb1, 0x7f, 0x1a, 0xfb, 0x25, 0x66, 0xa8, 0xbf, 0x55, 0x60, 0x61, 0x1d,
+	0x07, 0x91, 0x12, 0x29, 0x55, 0xfc, 0x82, 0xba, 0xec, 0x4f, 0x14, 0xe8, 0xc9, 0x78, 0x3d, 0x8d,
+	0x58, 0x1f, 0xc2, 0x7c, 0x44, 0x43, 0x37, 0x31, 0x19, 0xf8, 0xd6, 0x88, 0x19, 0x33, 0x73, 0xe0,
+	0xf5, 0xe5, 0x4b, 0x4b, 0xd9, 0x04, 0x63, 0x29, 0xcd, 0xc1, 0x85, 0x68, 0x89, 0xb5, 0xd8, 0x0a,
+	0xea, 0x0f, 0x14, 0xb8, 0xb0, 0x8e, 0x83, 0x6d, 0x3c, 0x74, 0xb0, 0x1b, 0x6c, 0xb8, 0xbb, 0xde,
+	0xc9, 0xe5, 0xfa, 0x2a, 0x00, 0x11, 0xeb, 0x44, 0xc1, 0x25, 0x06, 0x99, 0x46, 0xc6, 0x2c, 0x97,
+	0x49, 0xf3, 0x73, 0x1a, 0xd9, 0x7d, 0x01, 0xca, 0x96, 0xbb, 0xeb, 0x85, 0xa2, 0x7a, 0x4d, 0x26,
+	0xaa, 0x38, 0x31, 0x8e, 0xad, 0xfe, 0x44, 0x01, 0xb4, 0x8e, 0x03, 0x8d, 0x3b, 0x94, 0x53, 0xd8,
+	0x5a, 0x7a, 0xcf, 0x05, 0x89, 0x5d, 0x5d, 0x83, 0xce, 0xbe, 0x15, 0xec, 0xe9, 0x64, 0xcf, 0xf0,
+	0x4d, 0x9d, 0x1e, 0x7d, 0xc2, 0x64, 0x53, 0xd5, 0x5a, 0x14, 0xbe, 0x4d, 0xc1, 0x9b, 0x14, 0xaa,
+	0x7e, 0x5b, 0x81, 0xb9, 0x04, 0x5b, 0xa7, 0x11, 0xcd, 0x3b, 0x50, 0x15, 0x0e, 0xf3, 0x50, 0xe9,
+	0x08, 0x62, 0x4c, 0x3a, 0xd1, 0x04, 0xd5, 0xe5, 0x6a, 0xa2, 0xac, 0xdd, 0xc5, 0x86, 0x89, 0xfd,
+	0xb3, 0x95, 0x91, 0xfa, 0x7d, 0x05, 0x5e, 0xca, 0x10, 0x3c, 0xcd, 0xee, 0xbf, 0x04, 0x15, 0x26,
+	0xef, 0x70, 0xef, 0xaf, 0x4b, 0x2d, 0x23, 0x46, 0xee, 0xae, 0x45, 0x02, 0x4d, 0xcc, 0x51, 0x3d,
+	0xe8, 0xa4, 0xff, 0xa1, 0x8b, 0xd0, 0x10, 0xbe, 0x4c, 0x77, 0x0d, 0x87, 0x0b, 0xa0, 0xa6, 0xd5,
+	0x05, 0x6c, 0xd3, 0x70, 0x30, 0x5a, 0x80, 0x2a, 0x55, 0xaf, 0x6e, 0x99, 0xe1, 0xf9, 0x98, 0x65,
+	0x9e, 0xde, 0x24, 0xe8, 0x15, 0x00, 0xf6, 0xcb, 0x30, 0x4d, 0x9f, 0x67, 0x5b, 0x35, 0xad, 0x46,
+	0x21, 0xb7, 0x29, 0x40, 0xfd, 0x57, 0x01, 0xe6, 0x6f, 0x9b, 0xa6, 0x2c, 0x0e, 0x1c, 0x5f, 0xe0,
+	0x93, 0x70, 0x53, 0x88, 0x87, 0x9b, 0xa9, 0x9c, 0x60, 0xc6, 0xc7, 0x97, 0x8e, 0xe1, 0xe3, 0xcb,
+	0x79, 0x3e, 0x1e, 0xad, 0x43, 0x93, 0x60, 0xfc, 0x58, 0x1f, 0x79, 0x84, 0x39, 0x29, 0x16, 0xd2,
+	0xeb, 0xcb, 0x6a, 0x72, 0x37, 0x51, 0x61, 0x74, 0x8f, 0x0c, 0xb7, 0x04, 0xa6, 0xd6, 0xa0, 0x13,
+	0xc3, 0x11, 0xba, 0x0f, 0xf3, 0x43, 0xdb, 0xeb, 0x1b, 0xb6, 0x4e, 0xb0, 0x61, 0x63, 0x53, 0x17,
+	0x0e, 0x88, 0x74, 0x67, 0xa7, 0xf3, 0x00, 0xe7, 0xf9, 0xf4, 0x6d, 0x36, 0x5b, 0xfc, 0x20, 0xea,
+	0xdf, 0x14, 0x58, 0xd0, 0xb0, 0xe3, 0x7d, 0x84, 0xff, 0x5b, 0x55, 0xa0, 0xfe, 0x58, 0x81, 0x06,
+	0xcd, 0x1e, 0xef, 0xe1, 0x80, 0x9d, 0x76, 0xf4, 0x36, 0xd4, 0x6c, 0xcf, 0x30, 0xf5, 0xe0, 0x60,
+	0xc4, 0xb7, 0xd6, 0x4a, 0x6f, 0x8d, 0x4b, 0x8f, 0x4e, 0xda, 0x39, 0x18, 0x61, 0xad, 0x6a, 0x8b,
+	0xaf, 0xa9, 0xdc, 0x5e, 0x3a, 0x9c, 0x16, 0x65, 0x15, 0x50, 0x11, 0xe6, 0xbf, 0x66, 0x04, 0x83,
+	0xbd, 0x35, 0x47, 0xb0, 0x49, 0x9e, 0x8f, 0xcc, 0xa7, 0xc9, 0xe2, 0xa2, 0x58, 0x53, 0x96, 0x59,
+	0x1a, 0x2d, 0xdb, 0x97, 0x1e, 0x08, 0x35, 0xc4, 0x62, 0x4d, 0x2c, 0x1b, 0xae, 0x9c, 0x24, 0x1b,
+	0x5e, 0x85, 0x26, 0x7e, 0x3a, 0xb0, 0xc7, 0xd4, 0xad, 0x30, 0xea, 0xdc, 0xce, 0x5f, 0x95, 0x50,
+	0x8f, 0x9b, 0x79, 0x43, 0x4c, 0xda, 0x10, 0x3c, 0x70, 0x55, 0x3b, 0x38, 0x30, 0xba, 0x55, 0xc6,
+	0xc6, 0x62, 0x9e, 0xaa, 0x43, 0xfb, 0xe0, 0xea, 0xa6, 0x23, 0xf5, 0xdf, 0x0a, 0x2c, 0x70, 0x35,
+	0x61, 0x3b, 0x30, 0x9e, 0xaf, 0xa6, 0x22, 0x2d, 0x94, 0x8e, 0xa9, 0x85, 0x98, 0x04, 0x6a, 0xc7,
+	0x96, 0xc0, 0xcf, 0x4a, 0xd0, 0x16, 0xe2, 0xa5, 0x18, 0xec, 0xfc, 0xbc, 0x0c, 0xb5, 0x28, 0xfb,
+	0x11, 0xd9, 0xf9, 0x04, 0x80, 0x16, 0xa1, 0x1e, 0xb3, 0x1e, 0xb1, 0xd1, 0x38, 0x68, 0xaa, 0xdd,
+	0x86, 0xb9, 0x6c, 0x29, 0x96, 0xcb, 0xbe, 0x02, 0xb0, 0x6b, 0x8f, 0xc9, 0x9e, 0x1e, 0x58, 0x0e,
+	0x16, 0x15, 0x45, 0x8d, 0x41, 0x76, 0x2c, 0x07, 0xa3, 0xdb, 0xd0, 0xe8, 0x5b, 0xae, 0xed, 0x0d,
+	0xf5, 0x91, 0x11, 0xec, 0x91, 0x6e, 0x25, 0xd7, 0x5e, 0xee, 0x58, 0xd8, 0x36, 0x57, 0x18, 0xae,
+	0x56, 0xe7, 0x73, 0xb6, 0xe8, 0x14, 0xf4, 0x2a, 0xd4, 0xdd, 0xb1, 0xa3, 0x7b, 0xbb, 0xba, 0xef,
+	0xed, 0x53, 0x8b, 0x63, 0x24, 0xdc, 0xb1, 0xf3, 0xfe, 0xae, 0xe6, 0xed, 0xd3, 0xe0, 0x5a, 0xa3,
+	0x61, 0x96, 0xd8, 0xde, 0x90, 0x74, 0xab, 0x53, 0xad, 0x3f, 0x99, 0x40, 0x67, 0x9b, 0xd4, 0x8e,
+	0xd8, 0xec, 0xda, 0x74, 0xb3, 0xa3, 0x09, 0xe8, 0x0a, 0xb4, 0x06, 0x9e, 0x33, 0x32, 0x98, 0x84,
+	0xee, 0xf8, 0x9e, 0xd3, 0x05, 0x76, 0x56, 0x53, 0x50, 0xb4, 0x0a, 0x75, 0xcb, 0x35, 0xf1, 0x53,
+	0x71, 0x6a, 0xea, 0x8c, 0x8e, 0x2a, 0x53, 0x39, 0x23, 0xb4, 0x41, 0x71, 0x99, 0xd2, 0xc1, 0x0a,
+	0x3f, 0x09, 0x8d, 0xf9, 0x42, 0xa3, 0x3a, 0xb1, 0x9e, 0xe1, 0x6e, 0x83, 0x6b, 0x51, 0xc0, 0xb6,
+	0xad, 0x67, 0x58, 0xfd, 0x7d, 0x01, 0x5a, 0xc9, 0x15, 0x68, 0x55, 0xb6, 0xcb, 0x20, 0xa1, 0x59,
+	0x84, 0x43, 0xba, 0x1e, 0x76, 0x8d, 0xbe, 0x4d, 0xcf, 0xb2, 0x89, 0x9f, 0x32, 0xab, 0xa8, 0x6a,
+	0x75, 0x0e, 0x63, 0x0b, 0x50, 0xed, 0x72, 0xbe, 0x59, 0x92, 0xc1, 0xab, 0xa6, 0x1a, 0x83, 0xb0,
+	0x14, 0xa3, 0x0b, 0xb3, 0x9c, 0xbf, 0xd0, 0x26, 0xc2, 0x21, 0xfd, 0xd3, 0x1f, 0x5b, 0x8c, 0x2a,
+	0xb7, 0x89, 0x70, 0x88, 0xd6, 0xa0, 0xc1, 0x97, 0x1c, 0x19, 0xbe, 0xe1, 0x84, 0x16, 0x71, 0x51,
+	0x7a, 0x50, 0xdf, 0xc3, 0x07, 0x0f, 0x0c, 0x7b, 0x8c, 0xb7, 0x0c, 0xcb, 0xd7, 0xb8, 0x04, 0xb7,
+	0xd8, 0x2c, 0x9a, 0xc6, 0xf2, 0x55, 0x76, 0x2d, 0x1b, 0x0b, 0xdb, 0x9a, 0x65, 0x79, 0x4c, 0x8b,
+	0xc1, 0xef, 0x58, 0x36, 0xe6, 0xe6, 0x13, 0x6d, 0x81, 0xc9, 0xac, 0xca, 0xad, 0x87, 0x41, 0x98,
+	0xc4, 0xfe, 0x51, 0x80, 0x39, 0x7a, 0x88, 0xc2, 0xe0, 0x7b, 0x72, 0x3f, 0xf2, 0x0a, 0x80, 0x49,
+	0x02, 0x3d, 0xe1, 0x4b, 0x6a, 0x26, 0x09, 0x36, 0xb9, 0x3b, 0x79, 0x3b, 0x74, 0x15, 0xc5, 0xfc,
+	0x3a, 0x2a, 0x75, 0xa8, 0xb3, 0x4e, 0xfb, 0x44, 0xfd, 0xa6, 0x4b, 0xd0, 0x24, 0xde, 0xd8, 0x1f,
+	0x60, 0x3d, 0x51, 0xf7, 0x37, 0x38, 0x70, 0x53, 0xee, 0xed, 0x2a, 0xd2, 0xbe, 0x57, 0xcc, 0x6d,
+	0xcd, 0x1e, 0xdb, 0x6d, 0xfd, 0x55, 0x81, 0x79, 0xd1, 0x23, 0x39, 0xbd, 0xb4, 0xf3, 0xbc, 0x76,
+	0xe8, 0xa3, 0x8a, 0x87, 0xd4, 0xdb, 0xa5, 0x29, 0x62, 0x6e, 0x59, 0x12, 0x73, 0x93, 0x35, 0x67,
+	0x25, 0x5d, 0x73, 0xaa, 0xdf, 0x52, 0xa0, 0xb9, 0x8d, 0x0d, 0x7f, 0xb0, 0x17, 0xee, 0xeb, 0x2d,
+	0x28, 0xfa, 0xf8, 0x89, 0xd8, 0x56, 0xea, 0xbc, 0x8b, 0x41, 0x62, 0x82, 0x46, 0xd1, 0xd1, 0x6b,
+	0x50, 0x37, 0x1d, 0x3b, 0xd5, 0xd8, 0x00, 0xd3, 0xb1, 0xc3, 0x7c, 0x2b, 0xc9, 0x48, 0x31, 0xc3,
+	0xc8, 0xc7, 0x0a, 0x34, 0x3e, 0xe0, 0x49, 0x17, 0xe7, 0xe3, 0x56, 0x9c, 0x8f, 0x8b, 0x52, 0x3e,
+	0xe2, 0xf8, 0x9f, 0x12, 0x1b, 0x3f, 0x52, 0x60, 0xfe, 0x5d, 0xc3, 0x35, 0xbd, 0xdd, 0xdd, 0xd3,
+	0x2b, 0x7c, 0x35, 0xf2, 0x7e, 0x1b, 0xc7, 0xa9, 0xb1, 0x13, 0x93, 0xd4, 0xdf, 0x15, 0x00, 0x51,
+	0xeb, 0x5c, 0x31, 0x6c, 0xc3, 0x1d, 0xe0, 0x93, 0x73, 0x73, 0x19, 0x5a, 0x89, 0x33, 0x15, 0xdd,
+	0x17, 0xc4, 0x0f, 0x15, 0x41, 0xef, 0x41, 0xab, 0xcf, 0x49, 0xe9, 0x3e, 0x36, 0x88, 0xe7, 0x32,
+	0xbb, 0x6c, 0xc9, 0x0b, 0xc0, 0x1d, 0xdf, 0x1a, 0x0e, 0xb1, 0xbf, 0xea, 0xb9, 0x26, 0x2f, 0x36,
+	0x9a, 0xfd, 0x90, 0x4d, 0x3a, 0x95, 0xe9, 0x23, 0x72, 0x30, 0x61, 0x56, 0x08, 0x91, 0x87, 0x21,
+	0xe8, 0x0d, 0x38, 0x97, 0xac, 0x43, 0x26, 0x86, 0xdc, 0x21, 0xf1, 0x12, 0x43, 0xd6, 0x20, 0x91,
+	0x1c, 0x78, 0xf5, 0x9b, 0x80, 0xa2, 0x5c, 0x98, 0xa5, 0x5c, 0x2c, 0xa2, 0x4c, 0xd3, 0x0b, 0x7c,
+	0x19, 0x6a, 0x66, 0x38, 0x53, 0x58, 0xce, 0x04, 0x40, 0x3d, 0x12, 0xdf, 0x85, 0x4e, 0x9d, 0x03,
+	0x36, 0xc3, 0x6c, 0x83, 0x03, 0xef, 0x32, 0x98, 0xfa, 0x49, 0x01, 0x3a, 0xf1, 0xfa, 0x67, 0x6a,
+	0xda, 0x67, 0xd3, 0x19, 0x3c, 0xa4, 0xd8, 0x2b, 0x9d, 0xa2, 0xd8, 0xcb, 0x16, 0xa3, 0xe5, 0x93,
+	0x15, 0xa3, 0xea, 0x2f, 0x14, 0x68, 0xa7, 0x1a, 0x71, 0xe9, 0xbc, 0x4f, 0xc9, 0xe6, 0x7d, 0x5f,
+	0x84, 0x32, 0x4d, 0x86, 0x30, 0x13, 0x52, 0x4b, 0x9e, 0x93, 0x24, 0x57, 0xd5, 0xf8, 0x04, 0x74,
+	0x03, 0xe6, 0x24, 0x97, 0x37, 0x42, 0x95, 0x28, 0x7b, 0x77, 0xa3, 0xfe, 0xa1, 0x04, 0xf5, 0x98,
+	0x3c, 0x8e, 0x48, 0x59, 0xa7, 0xa9, 0xea, 0x52, 0xdb, 0x2b, 0x66, 0xb7, 0x97, 0x73, 0x7b, 0x81,
+	0x16, 0xa0, 0xea, 0x60, 0x87, 0xe7, 0x04, 0x22, 0x41, 0x71, 0xb0, 0x43, 0x33, 0x02, 0xd6, 0x37,
+	0x19, 0x3b, 0x3c, 0xd9, 0xe4, 0x87, 0x62, 0xd6, 0x1d, 0x3b, 0x2c, 0xd5, 0x4c, 0xa6, 0x43, 0xb3,
+	0x87, 0xa4, 0x43, 0xd5, 0x64, 0x3a, 0x94, 0x38, 0x0e, 0xb5, 0xf4, 0x71, 0x98, 0x36, 0x8b, 0xbc,
+	0x09, 0x73, 0x03, 0xd6, 0x45, 0x37, 0x57, 0x0e, 0x56, 0xa3, 0x5f, 0xdd, 0x3a, 0xcb, 0xdb, 0x64,
+	0xbf, 0xd0, 0x1d, 0x6a, 0x5c, 0x22, 0x65, 0x64, 0x5a, 0x6e, 0x30, 0x2d, 0xcb, 0xb3, 0x2d, 0xa1,
+	0x1b, 0xae, 0xe4, 0xd0, 0x6f, 0xb2, 0x51, 0x3a, 0x7f, 0x6d, 0x9e, 0x28, 0x7f, 0x7d, 0x0d, 0xea,
+	0xe1, 0x55, 0x8a, 0x65, 0x92, 0x6e, 0x8b, 0xfb, 0x2f, 0x01, 0xda, 0x30, 0x49, 0xa2, 0x63, 0xd5,
+	0x4e, 0x74, 0xac, 0xd4, 0x3f, 0x17, 0xa1, 0x35, 0x49, 0x70, 0xa6, 0x76, 0x05, 0xd3, 0x5c, 0x42,
+	0x6e, 0x42, 0x67, 0xd2, 0xf1, 0x66, 0x52, 0x3a, 0x34, 0x47, 0x4b, 0xf7, 0xba, 0xdb, 0xa3, 0xd4,
+	0x99, 0x4b, 0x74, 0x32, 0x4a, 0xc7, 0xea, 0x64, 0x9c, 0xf2, 0xae, 0xea, 0x16, 0x5c, 0xf0, 0x79,
+	0x7e, 0x65, 0xea, 0x89, 0x6d, 0xf3, 0x54, 0xe5, 0x7c, 0xf8, 0x73, 0x2b, 0xbe, 0xfd, 0x9c, 0x63,
+	0x3c, 0x9b, 0x77, 0x8c, 0xd3, 0x6a, 0xac, 0x66, 0xd4, 0x98, 0xbd, 0x32, 0xab, 0xc9, 0xae, 0xcc,
+	0xfe, 0xa2, 0x40, 0x3d, 0xd6, 0xef, 0xa5, 0x67, 0x24, 0x5c, 0x24, 0x72, 0x07, 0x11, 0x60, 0x2a,
+	0x77, 0x70, 0x09, 0x9a, 0x13, 0x4d, 0x52, 0xde, 0x32, 0x5d, 0x1e, 0x93, 0xfa, 0xdb, 0x16, 0xef,
+	0x7d, 0x47, 0xfd, 0x68, 0xee, 0xbe, 0x17, 0x73, 0x7b, 0xb2, 0x82, 0x49, 0xad, 0x49, 0x62, 0xa3,
+	0xa4, 0xb5, 0x96, 0x93, 0xd6, 0xfa, 0x43, 0x05, 0x1a, 0xf1, 0xa9, 0xa8, 0x07, 0x55, 0x9b, 0x75,
+	0x6f, 0xa3, 0xad, 0x45, 0x63, 0x2a, 0x4f, 0xfe, 0xcd, 0xda, 0xb1, 0x61, 0x9a, 0xc5, 0x41, 0xb7,
+	0x4d, 0xd3, 0x47, 0x57, 0xa0, 0x6d, 0x3a, 0x7a, 0xa2, 0xdd, 0xcb, 0xa3, 0x54, 0x33, 0x72, 0x21,
+	0x99, 0x86, 0x6f, 0x29, 0xc9, 0xd0, 0x7d, 0x98, 0xbb, 0xef, 0x92, 0x71, 0x9f, 0x0c, 0x7c, 0xab,
+	0x8f, 0xc3, 0x9e, 0xc9, 0x54, 0x47, 0xa8, 0x07, 0x55, 0x41, 0x9a, 0x1f, 0x9f, 0x9a, 0x16, 0x8d,
+	0xd5, 0xef, 0x2a, 0x30, 0x9f, 0x5d, 0x97, 0x69, 0x73, 0xe2, 0x78, 0x95, 0x84, 0xe3, 0xfd, 0x3a,
+	0xcc, 0x4d, 0x96, 0xd7, 0x13, 0x2b, 0xd7, 0x97, 0xaf, 0xca, 0x74, 0x20, 0x61, 0x5c, 0x43, 0x93,
+	0x35, 0x42, 0x98, 0xfa, 0x4f, 0x05, 0xce, 0x09, 0x17, 0x46, 0x61, 0x43, 0xd6, 0x6d, 0xa2, 0x36,
+	0xe1, 0xb9, 0xb6, 0xe5, 0x46, 0xc5, 0x8f, 0xd8, 0x23, 0x07, 0x8a, 0xe2, 0xe7, 0x5d, 0x68, 0x0b,
+	0xa4, 0x28, 0xa6, 0x4f, 0x99, 0x5e, 0xb6, 0xf8, 0xbc, 0x28, 0x9a, 0x5f, 0x86, 0x96, 0xb7, 0xbb,
+	0x1b, 0xa7, 0xc7, 0x83, 0x52, 0x53, 0x40, 0x05, 0xc1, 0xaf, 0x42, 0x27, 0x44, 0x3b, 0x6e, 0x16,
+	0xd1, 0x16, 0x13, 0xa3, 0x6e, 0xf1, 0x77, 0x14, 0xe8, 0x26, 0x73, 0x8a, 0xd8, 0xf6, 0x8f, 0x9f,
+	0xd9, 0xbe, 0x93, 0xbc, 0xc4, 0xba, 0x7c, 0x08, 0x3f, 0x13, 0x3a, 0xa2, 0x52, 0xbd, 0xfe, 0x0c,
+	0x5a, 0x49, 0xff, 0x88, 0x1a, 0x50, 0xdd, 0xf4, 0x82, 0xaf, 0x3c, 0xb5, 0x48, 0xd0, 0x99, 0x41,
+	0x2d, 0x80, 0x4d, 0x2f, 0xd8, 0xf2, 0x31, 0xc1, 0x6e, 0xd0, 0x51, 0x10, 0x40, 0xe5, 0x7d, 0x77,
+	0xcd, 0x22, 0x8f, 0x3b, 0x05, 0x34, 0x27, 0xd2, 0x17, 0xc3, 0xde, 0x10, 0x4e, 0xa7, 0x53, 0xa4,
+	0xd3, 0xa3, 0x51, 0x09, 0x75, 0xa0, 0x11, 0xa1, 0xac, 0x6f, 0xdd, 0xef, 0x94, 0x51, 0x0d, 0xca,
+	0xfc, 0xb3, 0x72, 0xdd, 0x84, 0x4e, 0x3a, 0x83, 0xa6, 0x6b, 0xde, 0x77, 0xdf, 0x73, 0xbd, 0xfd,
+	0x08, 0xd4, 0x99, 0x41, 0x75, 0x98, 0x15, 0x55, 0x49, 0x47, 0x41, 0x6d, 0xa8, 0xc7, 0x0a, 0x82,
+	0x4e, 0x81, 0x02, 0xd6, 0xfd, 0xd1, 0x40, 0x94, 0x06, 0x9c, 0x05, 0xaa, 0xb5, 0x35, 0x6f, 0xdf,
+	0xed, 0x94, 0xae, 0xaf, 0x40, 0x35, 0x74, 0xdc, 0x14, 0x95, 0xaf, 0xee, 0xd2, 0x61, 0x67, 0x06,
+	0x9d, 0x83, 0x66, 0xe2, 0x49, 0x44, 0x47, 0x41, 0x08, 0x5a, 0xc9, 0xe7, 0x2a, 0x9d, 0xc2, 0xf2,
+	0x4f, 0x9b, 0x00, 0x3c, 0xb3, 0xf5, 0x3c, 0xdf, 0x44, 0x23, 0x76, 0xfd, 0x47, 0xa3, 0xb6, 0xe7,
+	0x86, 0x11, 0x97, 0xa0, 0x9b, 0x39, 0x09, 0x60, 0x16, 0x55, 0xb0, 0xda, 0xbb, 0x92, 0x33, 0x23,
+	0x85, 0xae, 0xce, 0x20, 0x87, 0x51, 0xdc, 0xb1, 0x1c, 0xbc, 0x63, 0x0d, 0x1e, 0x47, 0x29, 0x71,
+	0x3e, 0xc5, 0x14, 0x6a, 0x48, 0xf1, 0x92, 0xbc, 0xa2, 0x0d, 0x7c, 0xcb, 0x1d, 0x86, 0x37, 0x66,
+	0xea, 0x0c, 0x7a, 0x02, 0xe7, 0xd7, 0x31, 0xa3, 0x6e, 0x91, 0xc0, 0x1a, 0x90, 0x90, 0xe0, 0x72,
+	0x3e, 0xc1, 0x0c, 0xf2, 0x31, 0x49, 0xda, 0xd0, 0x4e, 0x3d, 0x0f, 0x43, 0xd7, 0xe5, 0x0e, 0x5e,
+	0xf6, 0x94, 0xad, 0xf7, 0xc6, 0x54, 0xb8, 0x11, 0x35, 0x0b, 0x5a, 0xc9, 0xa7, 0x53, 0xe8, 0xff,
+	0xf3, 0x16, 0xc8, 0xbc, 0x0e, 0xe9, 0x5d, 0x9f, 0x06, 0x35, 0x22, 0xf5, 0x90, 0xdb, 0xd3, 0x51,
+	0xa4, 0xa4, 0x2f, 0x73, 0x7a, 0x87, 0x5d, 0x56, 0xaa, 0x33, 0xe8, 0x43, 0x38, 0x97, 0x79, 0xc3,
+	0x82, 0x3e, 0x27, 0xbf, 0xa7, 0x95, 0x3f, 0x75, 0x39, 0x8a, 0xc2, 0xc3, 0xf4, 0x69, 0xc8, 0xe7,
+	0x3e, 0xf3, 0xe6, 0x69, 0x7a, 0xee, 0x63, 0xcb, 0x1f, 0xc6, 0xfd, 0xb1, 0x29, 0x8c, 0x01, 0x65,
+	0x5f, 0xb1, 0xa0, 0x37, 0x65, 0x24, 0x72, 0x5f, 0xd2, 0xf4, 0x96, 0xa6, 0x45, 0x8f, 0x54, 0x3e,
+	0x66, 0xa7, 0x35, 0x5d, 0xda, 0x49, 0xc9, 0xe6, 0xbe, 0x5c, 0x91, 0x93, 0xcd, 0x7f, 0x3c, 0xc2,
+	0x8d, 0x3a, 0xf9, 0x38, 0x42, 0xae, 0x2b, 0xe9, 0x83, 0x0e, 0xb9, 0x51, 0xcb, 0xdf, 0x5a, 0xa8,
+	0x33, 0x68, 0x27, 0xe1, 0x84, 0xd1, 0x95, 0x3c, 0x9b, 0x48, 0xb6, 0x6d, 0x8e, 0x52, 0x97, 0x0e,
+	0xb0, 0x8e, 0x83, 0x7b, 0x38, 0xf0, 0xad, 0x01, 0x49, 0x2f, 0x2a, 0x06, 0x13, 0x84, 0x70, 0xd1,
+	0xab, 0x47, 0xe2, 0x45, 0x6c, 0x7f, 0x08, 0xf5, 0xd8, 0x03, 0x09, 0x39, 0xdb, 0xd9, 0x87, 0x1d,
+	0xbd, 0xab, 0x47, 0xe2, 0xc5, 0xdd, 0x58, 0xea, 0x21, 0x02, 0xca, 0x95, 0x6c, 0xf6, 0x79, 0x84,
+	0xdc, 0x8d, 0xe5, 0xbc, 0x6c, 0x50, 0x67, 0x96, 0xff, 0x54, 0x87, 0x1a, 0xb3, 0x41, 0x1a, 0xef,
+	0xfe, 0x17, 0x96, 0xce, 0x20, 0x2c, 0x3d, 0x82, 0x76, 0xea, 0x61, 0x85, 0x5c, 0x9f, 0xf2, 0xd7,
+	0x17, 0x47, 0x19, 0x7c, 0x1f, 0x50, 0xf6, 0xd9, 0x80, 0xdc, 0x51, 0xe4, 0x3e, 0x2f, 0x38, 0x8a,
+	0xc6, 0x23, 0x68, 0xa7, 0xee, 0xc8, 0xe5, 0x3b, 0x90, 0x5f, 0xa4, 0x4f, 0xb1, 0x83, 0xec, 0xd5,
+	0xae, 0x7c, 0x07, 0xb9, 0x57, 0xc0, 0x47, 0xd1, 0x78, 0xc0, 0x5f, 0x1e, 0x44, 0x29, 0xfb, 0xd5,
+	0x3c, 0x6f, 0x93, 0xea, 0x59, 0x3f, 0xff, 0xf8, 0x73, 0xf6, 0xf1, 0xf9, 0x11, 0xb4, 0x53, 0x37,
+	0x34, 0x72, 0xed, 0xca, 0xaf, 0x71, 0x8e, 0x5a, 0xfd, 0x33, 0x8c, 0x28, 0x1f, 0x40, 0x85, 0x5f,
+	0xac, 0xa0, 0x8b, 0xf2, 0x02, 0x26, 0x76, 0xe9, 0xd2, 0x3b, 0xfc, 0x62, 0x86, 0x8c, 0xed, 0x80,
+	0x72, 0xbf, 0x09, 0x65, 0x76, 0x5e, 0x90, 0xb4, 0x53, 0x10, 0xbf, 0x3e, 0xe9, 0x1d, 0x7a, 0xc3,
+	0x12, 0xae, 0x77, 0xd6, 0xe1, 0x69, 0xe5, 0xad, 0x87, 0xcb, 0x43, 0x2b, 0xd8, 0x1b, 0xf7, 0xa9,
+	0x22, 0x6e, 0x70, 0xcc, 0x37, 0x2d, 0x4f, 0x7c, 0xdd, 0x08, 0xfd, 0xda, 0x0d, 0xb6, 0xd2, 0x0d,
+	0xb6, 0x8d, 0x51, 0xbf, 0x5f, 0x61, 0xc3, 0x5b, 0xff, 0x09, 0x00, 0x00, 0xff, 0xff, 0x3f, 0x55,
+	0xe8, 0x02, 0x5c, 0x32, 0x00, 0x00,
+>>>>>>> merge with yah01/mem_replica
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -5375,11 +6209,17 @@ type QueryCoordClient interface {
 	// https://wiki.lfaidata.foundation/display/MIL/MEP+8+--+Add+metrics+for+proxy
 	GetMetrics(ctx context.Context, in *milvuspb.GetMetricsRequest, opts ...grpc.CallOption) (*milvuspb.GetMetricsResponse, error)
 <<<<<<< HEAD
+<<<<<<< HEAD
 	// https://wiki.lfaidata.foundation/display/MIL/MEP+23+--+Multiple+memory+replication+design
 	GetReplicas(ctx context.Context, in *milvuspb.GetReplicasRequest, opts ...grpc.CallOption) (*milvuspb.GetReplicasResponse, error)
 	GetShardLeaders(ctx context.Context, in *GetShardLeadersRequest, opts ...grpc.CallOption) (*GetShardLeadersResponse, error)
 =======
 >>>>>>> auto balance
+=======
+	// https://wiki.lfaidata.foundation/display/MIL/MEP+23+--+Multiple+memory+replication+design
+	GetReplicas(ctx context.Context, in *GetReplicasRequest, opts ...grpc.CallOption) (*GetReplicasResponse, error)
+	GetShardLeaders(ctx context.Context, in *GetShardLeadersRequest, opts ...grpc.CallOption) (*GetShardLeadersResponse, error)
+>>>>>>> merge with yah01/mem_replica
 }
 
 type queryCoordClient struct {
@@ -5517,8 +6357,13 @@ func (c *queryCoordClient) GetMetrics(ctx context.Context, in *milvuspb.GetMetri
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 func (c *queryCoordClient) GetReplicas(ctx context.Context, in *milvuspb.GetReplicasRequest, opts ...grpc.CallOption) (*milvuspb.GetReplicasResponse, error) {
 	out := new(milvuspb.GetReplicasResponse)
+=======
+func (c *queryCoordClient) GetReplicas(ctx context.Context, in *GetReplicasRequest, opts ...grpc.CallOption) (*GetReplicasResponse, error) {
+	out := new(GetReplicasResponse)
+>>>>>>> merge with yah01/mem_replica
 	err := c.cc.Invoke(ctx, "/milvus.proto.query.QueryCoord/GetReplicas", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -5535,8 +6380,11 @@ func (c *queryCoordClient) GetShardLeaders(ctx context.Context, in *GetShardLead
 	return out, nil
 }
 
+<<<<<<< HEAD
 =======
 >>>>>>> auto balance
+=======
+>>>>>>> merge with yah01/mem_replica
 // QueryCoordServer is the server API for QueryCoord service.
 type QueryCoordServer interface {
 	GetComponentStates(context.Context, *internalpb.GetComponentStatesRequest) (*internalpb.ComponentStates, error)
@@ -5555,11 +6403,17 @@ type QueryCoordServer interface {
 	// https://wiki.lfaidata.foundation/display/MIL/MEP+8+--+Add+metrics+for+proxy
 	GetMetrics(context.Context, *milvuspb.GetMetricsRequest) (*milvuspb.GetMetricsResponse, error)
 <<<<<<< HEAD
+<<<<<<< HEAD
 	// https://wiki.lfaidata.foundation/display/MIL/MEP+23+--+Multiple+memory+replication+design
 	GetReplicas(context.Context, *milvuspb.GetReplicasRequest) (*milvuspb.GetReplicasResponse, error)
 	GetShardLeaders(context.Context, *GetShardLeadersRequest) (*GetShardLeadersResponse, error)
 =======
 >>>>>>> auto balance
+=======
+	// https://wiki.lfaidata.foundation/display/MIL/MEP+23+--+Multiple+memory+replication+design
+	GetReplicas(context.Context, *GetReplicasRequest) (*GetReplicasResponse, error)
+	GetShardLeaders(context.Context, *GetShardLeadersRequest) (*GetShardLeadersResponse, error)
+>>>>>>> merge with yah01/mem_replica
 }
 
 // UnimplementedQueryCoordServer can be embedded to have forward compatible implementations.
@@ -5609,6 +6463,7 @@ func (*UnimplementedQueryCoordServer) GetMetrics(context.Context, *milvuspb.GetM
 	return nil, status.Errorf(codes.Unimplemented, "method GetMetrics not implemented")
 }
 <<<<<<< HEAD
+<<<<<<< HEAD
 func (*UnimplementedQueryCoordServer) GetReplicas(context.Context, *milvuspb.GetReplicasRequest) (*milvuspb.GetReplicasResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetReplicas not implemented")
 }
@@ -5617,6 +6472,14 @@ func (*UnimplementedQueryCoordServer) GetShardLeaders(context.Context, *GetShard
 }
 =======
 >>>>>>> auto balance
+=======
+func (*UnimplementedQueryCoordServer) GetReplicas(ctx context.Context, req *GetReplicasRequest) (*GetReplicasResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetReplicas not implemented")
+}
+func (*UnimplementedQueryCoordServer) GetShardLeaders(ctx context.Context, req *GetShardLeadersRequest) (*GetShardLeadersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetShardLeaders not implemented")
+}
+>>>>>>> merge with yah01/mem_replica
 
 func RegisterQueryCoordServer(s *grpc.Server, srv QueryCoordServer) {
 	s.RegisterService(&_QueryCoord_serviceDesc, srv)
@@ -5875,8 +6738,13 @@ func _QueryCoord_GetMetrics_Handler(srv interface{}, ctx context.Context, dec fu
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 func _QueryCoord_GetReplicas_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(milvuspb.GetReplicasRequest)
+=======
+func _QueryCoord_GetReplicas_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetReplicasRequest)
+>>>>>>> merge with yah01/mem_replica
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -5888,7 +6756,11 @@ func _QueryCoord_GetReplicas_Handler(srv interface{}, ctx context.Context, dec f
 		FullMethod: "/milvus.proto.query.QueryCoord/GetReplicas",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+<<<<<<< HEAD
 		return srv.(QueryCoordServer).GetReplicas(ctx, req.(*milvuspb.GetReplicasRequest))
+=======
+		return srv.(QueryCoordServer).GetReplicas(ctx, req.(*GetReplicasRequest))
+>>>>>>> merge with yah01/mem_replica
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -5911,8 +6783,11 @@ func _QueryCoord_GetShardLeaders_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+<<<<<<< HEAD
 =======
 >>>>>>> auto balance
+=======
+>>>>>>> merge with yah01/mem_replica
 var _QueryCoord_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "milvus.proto.query.QueryCoord",
 	HandlerType: (*QueryCoordServer)(nil),
@@ -5973,6 +6848,14 @@ var _QueryCoord_serviceDesc = grpc.ServiceDesc{
 			MethodName: "GetMetrics",
 			Handler:    _QueryCoord_GetMetrics_Handler,
 		},
+		{
+			MethodName: "GetReplicas",
+			Handler:    _QueryCoord_GetReplicas_Handler,
+		},
+		{
+			MethodName: "GetShardLeaders",
+			Handler:    _QueryCoord_GetShardLeaders_Handler,
+		},
 	},
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "query_coord.proto",
@@ -5995,10 +6878,15 @@ type QueryNodeClient interface {
 	ReleaseSegments(ctx context.Context, in *ReleaseSegmentsRequest, opts ...grpc.CallOption) (*commonpb.Status, error)
 	GetSegmentInfo(ctx context.Context, in *GetSegmentInfoRequest, opts ...grpc.CallOption) (*GetSegmentInfoResponse, error)
 <<<<<<< HEAD
+<<<<<<< HEAD
 	Search(ctx context.Context, in *SearchRequest, opts ...grpc.CallOption) (*internalpb.SearchResults, error)
 	Query(ctx context.Context, in *QueryRequest, opts ...grpc.CallOption) (*internalpb.RetrieveResults, error)
 =======
 >>>>>>> auto balance
+=======
+	Search(ctx context.Context, in *SearchRequest, opts ...grpc.CallOption) (*milvuspb.SearchResults, error)
+	Query(ctx context.Context, in *QueryRequest, opts ...grpc.CallOption) (*milvuspb.QueryResults, error)
+>>>>>>> merge with yah01/mem_replica
 	// https://wiki.lfaidata.foundation/display/MIL/MEP+8+--+Add+metrics+for+proxy
 	GetMetrics(ctx context.Context, in *milvuspb.GetMetricsRequest, opts ...grpc.CallOption) (*milvuspb.GetMetricsResponse, error)
 }
@@ -6120,8 +7008,13 @@ func (c *queryNodeClient) GetSegmentInfo(ctx context.Context, in *GetSegmentInfo
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 func (c *queryNodeClient) Search(ctx context.Context, in *SearchRequest, opts ...grpc.CallOption) (*internalpb.SearchResults, error) {
 	out := new(internalpb.SearchResults)
+=======
+func (c *queryNodeClient) Search(ctx context.Context, in *SearchRequest, opts ...grpc.CallOption) (*milvuspb.SearchResults, error) {
+	out := new(milvuspb.SearchResults)
+>>>>>>> merge with yah01/mem_replica
 	err := c.cc.Invoke(ctx, "/milvus.proto.query.QueryNode/Search", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -6129,8 +7022,13 @@ func (c *queryNodeClient) Search(ctx context.Context, in *SearchRequest, opts ..
 	return out, nil
 }
 
+<<<<<<< HEAD
 func (c *queryNodeClient) Query(ctx context.Context, in *QueryRequest, opts ...grpc.CallOption) (*internalpb.RetrieveResults, error) {
 	out := new(internalpb.RetrieveResults)
+=======
+func (c *queryNodeClient) Query(ctx context.Context, in *QueryRequest, opts ...grpc.CallOption) (*milvuspb.QueryResults, error) {
+	out := new(milvuspb.QueryResults)
+>>>>>>> merge with yah01/mem_replica
 	err := c.cc.Invoke(ctx, "/milvus.proto.query.QueryNode/Query", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -6138,8 +7036,11 @@ func (c *queryNodeClient) Query(ctx context.Context, in *QueryRequest, opts ...g
 	return out, nil
 }
 
+<<<<<<< HEAD
 =======
 >>>>>>> auto balance
+=======
+>>>>>>> merge with yah01/mem_replica
 func (c *queryNodeClient) GetMetrics(ctx context.Context, in *milvuspb.GetMetricsRequest, opts ...grpc.CallOption) (*milvuspb.GetMetricsResponse, error) {
 	out := new(milvuspb.GetMetricsResponse)
 	err := c.cc.Invoke(ctx, "/milvus.proto.query.QueryNode/GetMetrics", in, out, opts...)
@@ -6164,10 +7065,15 @@ type QueryNodeServer interface {
 	ReleaseSegments(context.Context, *ReleaseSegmentsRequest) (*commonpb.Status, error)
 	GetSegmentInfo(context.Context, *GetSegmentInfoRequest) (*GetSegmentInfoResponse, error)
 <<<<<<< HEAD
+<<<<<<< HEAD
 	Search(context.Context, *SearchRequest) (*internalpb.SearchResults, error)
 	Query(context.Context, *QueryRequest) (*internalpb.RetrieveResults, error)
 =======
 >>>>>>> auto balance
+=======
+	Search(context.Context, *SearchRequest) (*milvuspb.SearchResults, error)
+	Query(context.Context, *QueryRequest) (*milvuspb.QueryResults, error)
+>>>>>>> merge with yah01/mem_replica
 	// https://wiki.lfaidata.foundation/display/MIL/MEP+8+--+Add+metrics+for+proxy
 	GetMetrics(context.Context, *milvuspb.GetMetricsRequest) (*milvuspb.GetMetricsResponse, error)
 }
@@ -6213,6 +7119,7 @@ func (*UnimplementedQueryNodeServer) GetSegmentInfo(context.Context, *GetSegment
 	return nil, status.Errorf(codes.Unimplemented, "method GetSegmentInfo not implemented")
 }
 <<<<<<< HEAD
+<<<<<<< HEAD
 func (*UnimplementedQueryNodeServer) Search(context.Context, *SearchRequest) (*internalpb.SearchResults, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Search not implemented")
 }
@@ -6221,6 +7128,14 @@ func (*UnimplementedQueryNodeServer) Query(context.Context, *QueryRequest) (*int
 }
 func (*UnimplementedQueryNodeServer) GetMetrics(context.Context, *milvuspb.GetMetricsRequest) (*milvuspb.GetMetricsResponse, error) {
 =======
+=======
+func (*UnimplementedQueryNodeServer) Search(ctx context.Context, req *SearchRequest) (*milvuspb.SearchResults, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Search not implemented")
+}
+func (*UnimplementedQueryNodeServer) Query(ctx context.Context, req *QueryRequest) (*milvuspb.QueryResults, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Query not implemented")
+}
+>>>>>>> merge with yah01/mem_replica
 func (*UnimplementedQueryNodeServer) GetMetrics(ctx context.Context, req *milvuspb.GetMetricsRequest) (*milvuspb.GetMetricsResponse, error) {
 >>>>>>> auto balance
 	return nil, status.Errorf(codes.Unimplemented, "method GetMetrics not implemented")
@@ -6446,6 +7361,42 @@ func _QueryNode_GetSegmentInfo_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _QueryNode_Search_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SearchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(QueryNodeServer).Search(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/milvus.proto.query.QueryNode/Search",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(QueryNodeServer).Search(ctx, req.(*SearchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _QueryNode_Query_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(QueryNodeServer).Query(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/milvus.proto.query.QueryNode/Query",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(QueryNodeServer).Query(ctx, req.(*QueryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _QueryNode_GetMetrics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(milvuspb.GetMetricsRequest)
 	if err := dec(in); err != nil {
@@ -6515,6 +7466,14 @@ var _QueryNode_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetSegmentInfo",
 			Handler:    _QueryNode_GetSegmentInfo_Handler,
+		},
+		{
+			MethodName: "Search",
+			Handler:    _QueryNode_Search_Handler,
+		},
+		{
+			MethodName: "Query",
+			Handler:    _QueryNode_Query_Handler,
 		},
 		{
 			MethodName: "GetMetrics",

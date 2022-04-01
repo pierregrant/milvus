@@ -489,7 +489,7 @@ func (lct *loadCollectionTask) execute(ctx context.Context) error {
 			watchDmChannelReqs = append(watchDmChannelReqs, watchRequest)
 		}
 
-		internalTasks, err := assignInternalTask(ctx, lct, lct.meta, lct.cluster, loadSegmentReqs, watchDmChannelReqs, false, nil, replica.NodeIds)
+		internalTasks, err := assignInternalTask(ctx, lct, lct.meta, lct.cluster, loadSegmentReqs, watchDmChannelReqs, false, nil, nil, replica.GetReplicaID())
 		if err != nil {
 			log.Error("loadCollectionTask: assign child task failed", zap.Int64("collectionID", collectionID), zap.Int64("msgID", lct.Base.MsgID), zap.Error(err))
 			lct.setResultInfo(err)
@@ -899,7 +899,7 @@ func (lpt *loadPartitionTask) execute(ctx context.Context) error {
 			watchDmChannelReqs = append(watchDmChannelReqs, watchRequest)
 		}
 
-		internalTasks, err := assignInternalTask(ctx, lpt, lpt.meta, lpt.cluster, loadSegmentReqs, watchDmChannelReqs, false, nil, replica.NodeIds)
+		internalTasks, err := assignInternalTask(ctx, lpt, lpt.meta, lpt.cluster, loadSegmentReqs, watchDmChannelReqs, false, nil, nil, replica.GetReplicaID())
 		if err != nil {
 			log.Error("loadPartitionTask: assign child task failed", zap.Int64("collectionID", collectionID), zap.Int64s("partitionIDs", partitionIDs), zap.Int64("msgID", lpt.Base.MsgID), zap.Error(err))
 			lpt.setResultInfo(err)
@@ -1698,14 +1698,14 @@ func (ht *handoffTask) execute(ctx context.Context) error {
 			var internalTasks []task
 			for _, replica := range replicas {
 				if len(replica.NodeIds) == 0 {
-					log.Warn("handoffTask: find empty replica", zap.Int64("collectionID", collectionID), zap.Int64("segmentID", segmentID), zap.Int64("replicaID", replica.ReplicaId))
-					err := fmt.Errorf("replica %d of collection %d is empty", replica.ReplicaId, collectionID)
+					log.Warn("handoffTask: find empty replica", zap.Int64("collectionID", collectionID), zap.Int64("segmentID", segmentID), zap.Int64("replicaID", replica.GetReplicaID()))
+					err := fmt.Errorf("replica %d of collection %d is empty", replica.GetReplicaID(), collectionID)
 					ht.setResultInfo(err)
 					return err
 				}
 				// we should copy a request because assignInternalTask will change DstNodeID of LoadSegmentRequest
 				clonedReq := proto.Clone(loadSegmentReq).(*querypb.LoadSegmentsRequest)
-				tasks, err := assignInternalTask(ctx, ht, ht.meta, ht.cluster, []*querypb.LoadSegmentsRequest{clonedReq}, nil, true, nil, nil, replica.GetReplicaId())
+				tasks, err := assignInternalTask(ctx, ht, ht.meta, ht.cluster, []*querypb.LoadSegmentsRequest{clonedReq}, nil, true, nil, nil, replica.GetReplicaID())
 				if err != nil {
 					log.Error("handoffTask: assign child task failed", zap.Int64("collectionID", collectionID), zap.Int64("segmentID", segmentID), zap.Error(err))
 					ht.setResultInfo(err)
@@ -1812,8 +1812,8 @@ func (lbt *loadBalanceTask) preExecute(context.Context) error {
 			return err
 		}
 		if replicaID == -1 {
-			replicaID = replica.GetReplicaId()
-		} else if replicaID != replica.GetReplicaId() {
+			replicaID = replica.GetReplicaID()
+		} else if replicaID != replica.GetReplicaID() {
 			err := errors.New("source nodes and destination nodes must be in the same replica group")
 			lbt.setResultInfo(err)
 			return err
@@ -1956,7 +1956,7 @@ func (lbt *loadBalanceTask) execute(ctx context.Context) error {
 					lbt.setResultInfo(err)
 					return err
 				}
-				tasks, err := assignInternalTask(ctx, lbt, lbt.meta, lbt.cluster, loadSegmentReqs, watchDmChannelReqs, true, lbt.SourceNodeIDs, lbt.DstNodeIDs, replica.GetReplicaId())
+				tasks, err := assignInternalTask(ctx, lbt, lbt.meta, lbt.cluster, loadSegmentReqs, watchDmChannelReqs, true, lbt.SourceNodeIDs, lbt.DstNodeIDs, replica.GetReplicaID())
 				if err != nil {
 					log.Error("loadBalanceTask: assign child task failed", zap.Int64("sourceNodeID", nodeID))
 					lbt.setResultInfo(err)
@@ -2113,7 +2113,7 @@ func (lbt *loadBalanceTask) getReplica(nodeID, collectionID int64) (*querypb.Rep
 		return nil, err
 	}
 	for _, replica := range replicas {
-		if replica.GetCollectionId() == collectionID {
+		if replica.GetCollectionID() == collectionID {
 			return replica, nil
 		}
 	}
