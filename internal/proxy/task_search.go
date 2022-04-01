@@ -16,12 +16,10 @@ import (
 	"github.com/milvus-io/milvus/internal/mq/msgstream"
 	"github.com/milvus-io/milvus/internal/types"
 
-	"github.com/milvus-io/milvus/internal/util/distance"
 	"github.com/milvus-io/milvus/internal/util/funcutil"
 	"github.com/milvus-io/milvus/internal/util/timerecord"
 	"github.com/milvus-io/milvus/internal/util/trace"
 	"github.com/milvus-io/milvus/internal/util/tsoutil"
-	"github.com/milvus-io/milvus/internal/util/typeutil"
 
 	"github.com/milvus-io/milvus/internal/proto/commonpb"
 	"github.com/milvus-io/milvus/internal/proto/internalpb"
@@ -430,156 +428,156 @@ func (st *searchTask) PostExecute(ctx context.Context) error {
 	}
 }
 
-func decodeSearchResults(searchResults []*internalpb.SearchResults) ([]*schemapb.SearchResultData, error) {
-	tr := timerecord.NewTimeRecorder("decodeSearchResults")
-	results := make([]*schemapb.SearchResultData, 0)
-	for _, partialSearchResult := range searchResults {
-		if partialSearchResult.SlicedBlob == nil {
-			continue
-		}
+// func decodeSearchResults(searchResults []*internalpb.SearchResults) ([]*schemapb.SearchResultData, error) {
+//     tr := timerecord.NewTimeRecorder("decodeSearchResults")
+//     results := make([]*schemapb.SearchResultData, 0)
+//     for _, partialSearchResult := range searchResults {
+//         if partialSearchResult.SlicedBlob == nil {
+//             continue
+//         }
+//
+//         var partialResultData schemapb.SearchResultData
+//         err := proto.Unmarshal(partialSearchResult.SlicedBlob, &partialResultData)
+//         if err != nil {
+//             return nil, err
+//         }
+//
+//         results = append(results, &partialResultData)
+//     }
+//     tr.Elapse("decodeSearchResults done")
+//     return results, nil
+// }
 
-		var partialResultData schemapb.SearchResultData
-		err := proto.Unmarshal(partialSearchResult.SlicedBlob, &partialResultData)
-		if err != nil {
-			return nil, err
-		}
+// func checkSearchResultData(data *schemapb.SearchResultData, nq int64, topk int64) error {
+//     if data.NumQueries != nq {
+//         return fmt.Errorf("search result's nq(%d) mis-match with %d", data.NumQueries, nq)
+//     }
+//     if data.TopK != topk {
+//         return fmt.Errorf("search result's topk(%d) mis-match with %d", data.TopK, topk)
+//     }
+//     if len(data.Ids.GetIntId().Data) != (int)(nq*topk) {
+//         return fmt.Errorf("search result's id length %d invalid", len(data.Ids.GetIntId().Data))
+//     }
+//     if len(data.Scores) != (int)(nq*topk) {
+//         return fmt.Errorf("search result's score length %d invalid", len(data.Scores))
+//     }
+//     return nil
+// }
 
-		results = append(results, &partialResultData)
-	}
-	tr.Elapse("decodeSearchResults done")
-	return results, nil
-}
+// func selectSearchResultData(dataArray []*schemapb.SearchResultData, offsets []int64, topk int64, qi int64) int {
+//     sel := -1
+//     maxDistance := minFloat32
+//     for i, offset := range offsets { // query num, the number of ways to merge
+//         if offset >= topk {
+//             continue
+//         }
+//         idx := qi*topk + offset
+//         id := dataArray[i].Ids.GetIntId().Data[idx]
+//         if id != -1 {
+//             distance := dataArray[i].Scores[idx]
+//             if distance > maxDistance {
+//                 sel = i
+//                 maxDistance = distance
+//             }
+//         }
+//     }
+//     return sel
+// }
 
-func checkSearchResultData(data *schemapb.SearchResultData, nq int64, topk int64) error {
-	if data.NumQueries != nq {
-		return fmt.Errorf("search result's nq(%d) mis-match with %d", data.NumQueries, nq)
-	}
-	if data.TopK != topk {
-		return fmt.Errorf("search result's topk(%d) mis-match with %d", data.TopK, topk)
-	}
-	if len(data.Ids.GetIntId().Data) != (int)(nq*topk) {
-		return fmt.Errorf("search result's id length %d invalid", len(data.Ids.GetIntId().Data))
-	}
-	if len(data.Scores) != (int)(nq*topk) {
-		return fmt.Errorf("search result's score length %d invalid", len(data.Scores))
-	}
-	return nil
-}
-
-func selectSearchResultData(dataArray []*schemapb.SearchResultData, offsets []int64, topk int64, qi int64) int {
-	sel := -1
-	maxDistance := minFloat32
-	for i, offset := range offsets { // query num, the number of ways to merge
-		if offset >= topk {
-			continue
-		}
-		idx := qi*topk + offset
-		id := dataArray[i].Ids.GetIntId().Data[idx]
-		if id != -1 {
-			distance := dataArray[i].Scores[idx]
-			if distance > maxDistance {
-				sel = i
-				maxDistance = distance
-			}
-		}
-	}
-	return sel
-}
-
-func reduceSearchResultData(searchResultData []*schemapb.SearchResultData, nq int64, topk int64, metricType string) (*milvuspb.SearchResults, error) {
-
-	tr := timerecord.NewTimeRecorder("reduceSearchResultData")
-	defer func() {
-		tr.Elapse("done")
-	}()
-
-	log.Debug("reduceSearchResultData", zap.Int("len(searchResultData)", len(searchResultData)),
-		zap.Int64("nq", nq), zap.Int64("topk", topk), zap.String("metricType", metricType))
-
-	ret := &milvuspb.SearchResults{
-		Status: &commonpb.Status{
-			ErrorCode: 0,
-		},
-		Results: &schemapb.SearchResultData{
-			NumQueries: nq,
-			TopK:       topk,
-			FieldsData: make([]*schemapb.FieldData, len(searchResultData[0].FieldsData)),
-			Scores:     make([]float32, 0),
-			Ids: &schemapb.IDs{
-				IdField: &schemapb.IDs_IntId{
-					IntId: &schemapb.LongArray{
-						Data: make([]int64, 0),
-					},
-				},
-			},
-			Topks: make([]int64, 0),
-		},
-	}
-
-	for i, sData := range searchResultData {
-		log.Debug("reduceSearchResultData",
-			zap.Int("i", i),
-			zap.Int64("nq", sData.NumQueries),
-			zap.Int64("topk", sData.TopK),
-			zap.Any("len(FieldsData)", len(sData.FieldsData)))
-		if err := checkSearchResultData(sData, nq, topk); err != nil {
-			return ret, err
-		}
-		//printSearchResultData(sData, strconv.FormatInt(int64(i), 10))
-	}
-
-	var skipDupCnt int64
-	var realTopK int64 = -1
-	for i := int64(0); i < nq; i++ {
-		offsets := make([]int64, len(searchResultData))
-
-		var idSet = make(map[int64]struct{})
-		var j int64
-		for j = 0; j < topk; {
-			sel := selectSearchResultData(searchResultData, offsets, topk, i)
-			if sel == -1 {
-				break
-			}
-			idx := i*topk + offsets[sel]
-
-			id := searchResultData[sel].Ids.GetIntId().Data[idx]
-			score := searchResultData[sel].Scores[idx]
-			// ignore invalid search result
-			if id == -1 {
-				continue
-			}
-
-			// remove duplicates
-			if _, ok := idSet[id]; !ok {
-				typeutil.AppendFieldData(ret.Results.FieldsData, searchResultData[sel].FieldsData, idx)
-				ret.Results.Ids.GetIntId().Data = append(ret.Results.Ids.GetIntId().Data, id)
-				ret.Results.Scores = append(ret.Results.Scores, score)
-				idSet[id] = struct{}{}
-				j++
-			} else {
-				// skip entity with same id
-				skipDupCnt++
-			}
-			offsets[sel]++
-		}
-		if realTopK != -1 && realTopK != j {
-			log.Warn("Proxy Reduce Search Result", zap.Error(errors.New("the length (topk) between all result of query is different")))
-			// return nil, errors.New("the length (topk) between all result of query is different")
-		}
-		realTopK = j
-		ret.Results.Topks = append(ret.Results.Topks, realTopK)
-	}
-	log.Debug("skip duplicated search result", zap.Int64("count", skipDupCnt))
-	ret.Results.TopK = realTopK
-
-	if !distance.PositivelyRelated(metricType) {
-		for k := range ret.Results.Scores {
-			ret.Results.Scores[k] *= -1
-		}
-	}
-
-	return ret, nil
-}
+// func reduceSearchResultData(searchResultData []*schemapb.SearchResultData, nq int64, topk int64, metricType string) (*milvuspb.SearchResults, error) {
+//
+//     tr := timerecord.NewTimeRecorder("reduceSearchResultData")
+//     defer func() {
+//         tr.Elapse("done")
+//     }()
+//
+//     log.Debug("reduceSearchResultData", zap.Int("len(searchResultData)", len(searchResultData)),
+//         zap.Int64("nq", nq), zap.Int64("topk", topk), zap.String("metricType", metricType))
+//
+//     ret := &milvuspb.SearchResults{
+//         Status: &commonpb.Status{
+//             ErrorCode: 0,
+//         },
+//         Results: &schemapb.SearchResultData{
+//             NumQueries: nq,
+//             TopK:       topk,
+//             FieldsData: make([]*schemapb.FieldData, len(searchResultData[0].FieldsData)),
+//             Scores:     make([]float32, 0),
+//             Ids: &schemapb.IDs{
+//                 IdField: &schemapb.IDs_IntId{
+//                     IntId: &schemapb.LongArray{
+//                         Data: make([]int64, 0),
+//                     },
+//                 },
+//             },
+//             Topks: make([]int64, 0),
+//         },
+//     }
+//
+//     for i, sData := range searchResultData {
+//         log.Debug("reduceSearchResultData",
+//             zap.Int("i", i),
+//             zap.Int64("nq", sData.NumQueries),
+//             zap.Int64("topk", sData.TopK),
+//             zap.Any("len(FieldsData)", len(sData.FieldsData)))
+//         if err := checkSearchResultData(sData, nq, topk); err != nil {
+//             return ret, err
+//         }
+//         //printSearchResultData(sData, strconv.FormatInt(int64(i), 10))
+//     }
+//
+//     var skipDupCnt int64
+//     var realTopK int64 = -1
+//     for i := int64(0); i < nq; i++ {
+//         offsets := make([]int64, len(searchResultData))
+//
+//         var idSet = make(map[int64]struct{})
+//         var j int64
+//         for j = 0; j < topk; {
+//             sel := selectSearchResultData(searchResultData, offsets, topk, i)
+//             if sel == -1 {
+//                 break
+//             }
+//             idx := i*topk + offsets[sel]
+//
+//             id := searchResultData[sel].Ids.GetIntId().Data[idx]
+//             score := searchResultData[sel].Scores[idx]
+//             // ignore invalid search result
+//             if id == -1 {
+//                 continue
+//             }
+//
+//             // remove duplicates
+//             if _, ok := idSet[id]; !ok {
+//                 typeutil.AppendFieldData(ret.Results.FieldsData, searchResultData[sel].FieldsData, idx)
+//                 ret.Results.Ids.GetIntId().Data = append(ret.Results.Ids.GetIntId().Data, id)
+//                 ret.Results.Scores = append(ret.Results.Scores, score)
+//                 idSet[id] = struct{}{}
+//                 j++
+//             } else {
+//                 // skip entity with same id
+//                 skipDupCnt++
+//             }
+//             offsets[sel]++
+//         }
+//         if realTopK != -1 && realTopK != j {
+//             log.Warn("Proxy Reduce Search Result", zap.Error(errors.New("the length (topk) between all result of query is different")))
+//             // return nil, errors.New("the length (topk) between all result of query is different")
+//         }
+//         realTopK = j
+//         ret.Results.Topks = append(ret.Results.Topks, realTopK)
+//     }
+//     log.Debug("skip duplicated search result", zap.Int64("count", skipDupCnt))
+//     ret.Results.TopK = realTopK
+//
+//     if !distance.PositivelyRelated(metricType) {
+//         for k := range ret.Results.Scores {
+//             ret.Results.Scores[k] *= -1
+//         }
+//     }
+//
+//     return ret, nil
+// }
 
 //func printSearchResultData(data *schemapb.SearchResultData, header string) {
 //	size := len(data.Ids.GetIntId().Data)

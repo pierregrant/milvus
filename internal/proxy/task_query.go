@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"strings"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -23,7 +22,6 @@ import (
 
 	"github.com/milvus-io/milvus/internal/util/timerecord"
 	"github.com/milvus-io/milvus/internal/util/tsoutil"
-	"github.com/milvus-io/milvus/internal/util/typeutil"
 )
 
 type queryTask struct {
@@ -398,54 +396,54 @@ func (qt *queryTask) getVChannels() ([]vChan, error) {
 	return channels, nil
 }
 
-// IDs2Expr converts ids slices to bool expresion with specified field name
-func IDs2Expr(fieldName string, ids []int64) string {
-	idsStr := strings.Trim(strings.Join(strings.Fields(fmt.Sprint(ids)), ", "), "[]")
-	return fieldName + " in [ " + idsStr + " ]"
-}
-
-func mergeRetrieveResults(retrieveResults []*internalpb.RetrieveResults) (*milvuspb.QueryResults, error) {
-	var ret *milvuspb.QueryResults
-	var skipDupCnt int64
-	var idSet = make(map[int64]struct{})
-
-	// merge results and remove duplicates
-	for _, rr := range retrieveResults {
-		// skip empty result, it will break merge result
-		if rr == nil || rr.Ids == nil || rr.Ids.GetIntId() == nil || len(rr.Ids.GetIntId().Data) == 0 {
-			continue
-		}
-
-		if ret == nil {
-			ret = &milvuspb.QueryResults{
-				FieldsData: make([]*schemapb.FieldData, len(rr.FieldsData)),
-			}
-		}
-
-		if len(ret.FieldsData) != len(rr.FieldsData) {
-			return nil, fmt.Errorf("mismatch FieldData in proxy RetrieveResults, expect %d get %d", len(ret.FieldsData), len(rr.FieldsData))
-		}
-
-		for i, id := range rr.Ids.GetIntId().GetData() {
-			if _, ok := idSet[id]; !ok {
-				typeutil.AppendFieldData(ret.FieldsData, rr.FieldsData, int64(i))
-				idSet[id] = struct{}{}
-			} else {
-				// primary keys duplicate
-				skipDupCnt++
-			}
-		}
-	}
-	log.Debug("skip duplicated query result", zap.Int64("count", skipDupCnt))
-
-	if ret == nil {
-		ret = &milvuspb.QueryResults{
-			FieldsData: []*schemapb.FieldData{},
-		}
-	}
-
-	return ret, nil
-}
+// // IDs2Expr converts ids slices to bool expresion with specified field name
+// func IDs2Expr(fieldName string, ids []int64) string {
+//     idsStr := strings.Trim(strings.Join(strings.Fields(fmt.Sprint(ids)), ", "), "[]")
+//     return fieldName + " in [ " + idsStr + " ]"
+// }
+//
+// func mergeRetrieveResults(retrieveResults []*internalpb.RetrieveResults) (*milvuspb.QueryResults, error) {
+//     var ret *milvuspb.QueryResults
+//     var skipDupCnt int64
+//     var idSet = make(map[int64]struct{})
+//
+//     // merge results and remove duplicates
+//     for _, rr := range retrieveResults {
+//         // skip empty result, it will break merge result
+//         if rr == nil || rr.Ids == nil || rr.Ids.GetIntId() == nil || len(rr.Ids.GetIntId().Data) == 0 {
+//             continue
+//         }
+//
+//         if ret == nil {
+//             ret = &milvuspb.QueryResults{
+//                 FieldsData: make([]*schemapb.FieldData, len(rr.FieldsData)),
+//             }
+//         }
+//
+//         if len(ret.FieldsData) != len(rr.FieldsData) {
+//             return nil, fmt.Errorf("mismatch FieldData in proxy RetrieveResults, expect %d get %d", len(ret.FieldsData), len(rr.FieldsData))
+//         }
+//
+//         for i, id := range rr.Ids.GetIntId().GetData() {
+//             if _, ok := idSet[id]; !ok {
+//                 typeutil.AppendFieldData(ret.FieldsData, rr.FieldsData, int64(i))
+//                 idSet[id] = struct{}{}
+//             } else {
+//                 // primary keys duplicate
+//                 skipDupCnt++
+//             }
+//         }
+//     }
+//     log.Debug("skip duplicated query result", zap.Int64("count", skipDupCnt))
+//
+//     if ret == nil {
+//         ret = &milvuspb.QueryResults{
+//             FieldsData: []*schemapb.FieldData{},
+//         }
+//     }
+//
+//     return ret, nil
+// }
 
 func (qt *queryTask) TraceCtx() context.Context {
 	return qt.ctx
