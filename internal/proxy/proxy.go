@@ -93,8 +93,7 @@ type Proxy struct {
 
 	factory dependency.Factory
 
-	searchResultCh   chan *internalpb.SearchResults
-	retrieveResultCh chan *internalpb.RetrieveResults
+	searchResultCh chan *internalpb.SearchResults
 
 	// Add callback functions at different stages
 	startCallbacks []func()

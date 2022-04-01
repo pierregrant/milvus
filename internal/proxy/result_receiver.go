@@ -16,9 +16,8 @@ func (node *Proxy) SendSearchResult(ctx context.Context, req *internalpb.SearchR
 }
 
 func (node *Proxy) SendRetrieveResult(ctx context.Context, req *internalpb.RetrieveResults) (*commonpb.Status, error) {
-	node.retrieveResultCh <- req
 	return &commonpb.Status{
-		ErrorCode: commonpb.ErrorCode_Success,
-		Reason:    "",
+		ErrorCode: commonpb.ErrorCode_UnexpectedError,
+		Reason:    "Not implemented",
 	}, nil
 }

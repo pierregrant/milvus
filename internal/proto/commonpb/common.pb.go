@@ -337,6 +337,7 @@ const (
 	MsgType_RemoveQueryChannels      MsgType = 511
 	MsgType_SealedSegmentsChangeInfo MsgType = 512
 	MsgType_WatchDeltaChannels       MsgType = 513
+	MsgType_GetShardLeaders          MsgType = 514
 	// DATA SERVICE
 	MsgType_SegmentInfo     MsgType = 600
 	MsgType_SystemInfo      MsgType = 601

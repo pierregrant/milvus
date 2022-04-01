@@ -619,22 +619,22 @@ func TestSearchTask_Execute(t *testing.T) {
 	// TODO(dragondriver): cover getDQLStream
 }
 
-func genSearchResultData(nq int64, topk int64, ids []int64, scores []float32) *schemapb.SearchResultData {
-	return &schemapb.SearchResultData{
-		NumQueries: nq,
-		TopK:       topk,
-		FieldsData: nil,
-		Scores:     scores,
-		Ids: &schemapb.IDs{
-			IdField: &schemapb.IDs_IntId{
-				IntId: &schemapb.LongArray{
-					Data: ids,
-				},
-			},
-		},
-		Topks: make([]int64, nq),
-	}
-}
+// func genSearchResultData(nq int64, topk int64, ids []int64, scores []float32) *schemapb.SearchResultData {
+//     return &schemapb.SearchResultData{
+//         NumQueries: nq,
+//         TopK:       topk,
+//         FieldsData: nil,
+//         Scores:     scores,
+//         Ids: &schemapb.IDs{
+//             IdField: &schemapb.IDs_IntId{
+//                 IntId: &schemapb.LongArray{
+//                     Data: ids,
+//                 },
+//             },
+//         },
+//         Topks: make([]int64, nq),
+//     }
+// }
 
 func TestSearchTask_Reduce(t *testing.T) {
 	const (
