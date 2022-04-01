@@ -186,7 +186,17 @@ func (qc *QueryCoord) Init() error {
 			return
 		}
 
-		qc.chunkManager, initError = qc.factory.NewVectorStorageChunkManager(qc.loopCtx)
+		// NOTE: ignore the returned error
+		// we only try best to reload the leader addresses
+		reloadShardLeaderAddress(qc.meta, qc.cluster)
+
+		qc.chunkManager, initError = storage.NewMinioChunkManager(qc.loopCtx,
+			storage.Address(Params.MinioCfg.Address),
+			storage.AccessKeyID(Params.MinioCfg.AccessKeyID),
+			storage.SecretAccessKeyID(Params.MinioCfg.SecretAccessKey),
+			storage.UseSSL(Params.MinioCfg.UseSSL),
+			storage.BucketName(Params.MinioCfg.BucketName),
+			storage.CreateBucket(true))
 
 		if initError != nil {
 			log.Error("query coordinator init cluster failed", zap.Error(initError))

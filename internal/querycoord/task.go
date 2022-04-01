@@ -498,8 +498,19 @@ func (lct *loadCollectionTask) execute(ctx context.Context) error {
 		for _, internalTask := range internalTasks {
 			lct.addChildTask(internalTask)
 			if task, ok := internalTask.(*watchDmChannelTask); ok {
+				nodeInfo, err := lct.cluster.getNodeInfoByID(task.NodeID)
+				if err != nil {
+					log.Error("loadCollectionTask: get shard leader node info failed",
+						zap.Int64("collectionID", collectionID),
+						zap.Int64("msgID", lct.Base.MsgID),
+						zap.Int64("nodeID", task.NodeID),
+						zap.Error(err))
+					lct.setResultInfo(err)
+					return err
+				}
 				replica.ShardReplicas = append(replica.ShardReplicas, &querypb.ShardReplica{
 					LeaderID:      task.NodeID,
+					LeaderAddr:    nodeInfo.(*queryNode).address,
 					DmChannelName: task.WatchDmChannelsRequest.Infos[0].ChannelName,
 				})
 			}
@@ -908,8 +919,20 @@ func (lpt *loadPartitionTask) execute(ctx context.Context) error {
 		for _, internalTask := range internalTasks {
 			lpt.addChildTask(internalTask)
 			if task, ok := internalTask.(*watchDmChannelTask); ok {
+				nodeInfo, err := lpt.cluster.getNodeInfoByID(task.NodeID)
+				if err != nil {
+					log.Error("loadCollectionTask: get shard leader node info failed",
+						zap.Int64("collectionID", collectionID),
+						zap.Int64("msgID", lpt.Base.MsgID),
+						zap.Int64("nodeID", task.NodeID),
+						zap.Error(err))
+					lpt.setResultInfo(err)
+					return err
+				}
+
 				replica.ShardReplicas = append(replica.ShardReplicas, &querypb.ShardReplica{
 					LeaderID:      task.NodeID,
+					LeaderAddr:    nodeInfo.(*queryNode).address,
 					DmChannelName: task.WatchDmChannelsRequest.Infos[0].ChannelName,
 				})
 			}

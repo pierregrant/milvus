@@ -245,7 +245,8 @@ func (m *MetaReplica) reloadFromKV() error {
 			shardReplicas := make([]*querypb.ShardReplica, 0, len(dmChannels[collectionInfo.CollectionID]))
 			for _, dmc := range dmChannels[collectionInfo.CollectionID] {
 				shardReplicas = append(shardReplicas, &querypb.ShardReplica{
-					LeaderID:        dmc.NodeIDLoaded,
+					LeaderID: dmc.NodeIDLoaded,
+					// LeaderAddr: Will set it after the cluster is reloaded
 					DmChannelName: dmc.DmChannel,
 				})
 			}
@@ -281,6 +282,47 @@ func (m *MetaReplica) reloadFromKV() error {
 
 	//TODO::update partition states
 	log.Debug("reload from kv finished")
+
+	return nil
+}
+
+// Compatibility for old meta format, this retrieves node address from cluster.
+// The leader address is not always valid
+func reloadShardLeaderAddress(meta Meta, cluster Cluster) error {
+	collections := meta.showCollections()
+	replicas := make([]*querypb.ReplicaInfo, 0)
+
+	for _, collection := range collections {
+		collectionReplicas, err := meta.getReplicasByCollectionID(collection.CollectionID)
+		if err != nil {
+			return err
+		}
+
+		replicas = append(replicas, collectionReplicas...)
+	}
+	for _, replica := range replicas {
+		isModified := false
+		for _, shard := range replica.ShardReplicas {
+			if len(shard.LeaderAddr) == 0 {
+				nodeInfo, err := cluster.getNodeInfoByID(shard.LeaderID)
+				if err != nil {
+					log.Warn("failed to retrieve the node's address",
+						zap.Int64("nodeID", shard.LeaderID),
+						zap.Error(err))
+					continue
+				}
+				shard.LeaderAddr = nodeInfo.(*queryNode).address
+				isModified = true
+			}
+		}
+
+		if isModified {
+			err := meta.setReplicaInfo(replica)
+			if err != nil {
+				return err
+			}
+		}
+	}
 
 	return nil
 }
