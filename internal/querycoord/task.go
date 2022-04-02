@@ -356,7 +356,7 @@ func (lct *loadCollectionTask) preExecute(ctx context.Context) error {
 	if lct.ReplicaNumber <= 0 {
 		lct.ReplicaNumber = 1
 	}
-	
+
 	collectionID := lct.CollectionID
 	schema := lct.Schema
 	lct.setResultInfo(nil)
@@ -1807,26 +1807,33 @@ func (lbt *loadBalanceTask) timestamp() Timestamp {
 }
 
 func (lbt *loadBalanceTask) preExecute(context.Context) error {
+	lbt.setResultInfo(nil)
+	log.Debug("start do loadBalanceTask",
+		zap.Int32("trigger type", int32(lbt.triggerCondition)),
+		zap.Int64s("sourceNodeIDs", lbt.SourceNodeIDs),
+		zap.Any("balanceReason", lbt.BalanceReason),
+		zap.Int64("taskID", lbt.getTaskID()))
+	return nil
+}
+
+func (lbt *loadBalanceTask) checkForManualLoadBalance() error {
 	// check segments belong to the same collection
 	collectionID := lbt.GetCollectionID()
 	for _, sid := range lbt.SealedSegmentIDs {
 		segment, err := lbt.meta.getSegmentInfoByID(sid)
 		if err != nil {
-			lbt.setResultInfo(err)
 			return err
 		}
 		if collectionID == 0 {
 			collectionID = segment.GetCollectionID()
 		} else if collectionID != segment.GetCollectionID() {
 			err := errors.New("segments of a load balance task do not belong to the same collection")
-			lbt.setResultInfo(err)
 			return err
 		}
 	}
 
 	if collectionID == 0 {
 		err := errors.New("a load balance task has to specify a collectionID or pass segments of a collection")
-		lbt.setResultInfo(err)
 		return err
 	}
 
@@ -1835,19 +1842,16 @@ func (lbt *loadBalanceTask) preExecute(context.Context) error {
 	for _, nodeID := range lbt.SourceNodeIDs {
 		replica, err := lbt.getReplica(nodeID, collectionID)
 		if err != nil {
-			lbt.setResultInfo(err)
 			return err
 		}
 		if replicaID == -1 {
 			replicaID = replica.GetReplicaID()
 		} else if replicaID != replica.GetReplicaID() {
 			err := errors.New("source nodes and destination nodes must be in the same replica group")
-			lbt.setResultInfo(err)
 			return err
 		}
 	}
 
-	lbt.setResultInfo(nil)
 	log.Debug("start do loadBalanceTask",
 		zap.Int32("trigger type", int32(lbt.triggerCondition)),
 		zap.Int64s("sourceNodeIDs", lbt.SourceNodeIDs),
@@ -2000,6 +2004,10 @@ func (lbt *loadBalanceTask) execute(ctx context.Context) error {
 	}
 
 	if lbt.triggerCondition == querypb.TriggerCondition_LoadBalance {
+		if err := lbt.checkForManualLoadBalance(); err != nil {
+			lbt.setResultInfo(err)
+			return err
+		}
 		if len(lbt.SourceNodeIDs) == 0 {
 			err := errors.New("loadBalanceTask: empty source Node list to balance")
 			log.Error(err.Error())

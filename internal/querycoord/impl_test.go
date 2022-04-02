@@ -120,8 +120,9 @@ func TestGrpcTask(t *testing.T) {
 			Base: &commonpb.MsgBase{
 				MsgType: commonpb.MsgType_LoadPartitions,
 			},
-			CollectionID: defaultCollectionID,
-			Schema:       genDefaultCollectionSchema(false),
+			CollectionID:  defaultCollectionID,
+			Schema:        genDefaultCollectionSchema(false),
+			ReplicaNumber: 1,
 		})
 		assert.Equal(t, commonpb.ErrorCode_UnexpectedError, status.ErrorCode)
 		assert.Nil(t, err)
@@ -132,9 +133,10 @@ func TestGrpcTask(t *testing.T) {
 			Base: &commonpb.MsgBase{
 				MsgType: commonpb.MsgType_LoadPartitions,
 			},
-			CollectionID: defaultCollectionID,
-			PartitionIDs: []UniqueID{defaultPartitionID},
-			Schema:       genDefaultCollectionSchema(false),
+			CollectionID:  defaultCollectionID,
+			PartitionIDs:  []UniqueID{defaultPartitionID},
+			Schema:        genDefaultCollectionSchema(false),
+			ReplicaNumber: 1,
 		})
 		assert.Equal(t, commonpb.ErrorCode_Success, status.ErrorCode)
 		assert.Nil(t, err)
@@ -432,9 +434,10 @@ func TestGrpcTaskEnqueueFail(t *testing.T) {
 			Base: &commonpb.MsgBase{
 				MsgType: commonpb.MsgType_LoadPartitions,
 			},
-			CollectionID: defaultCollectionID,
-			PartitionIDs: []UniqueID{defaultPartitionID},
-			Schema:       genDefaultCollectionSchema(false),
+			CollectionID:  defaultCollectionID,
+			PartitionIDs:  []UniqueID{defaultPartitionID},
+			Schema:        genDefaultCollectionSchema(false),
+			ReplicaNumber: 1,
 		})
 		assert.Equal(t, commonpb.ErrorCode_UnexpectedError, status.ErrorCode)
 		assert.Nil(t, err)
@@ -492,9 +495,10 @@ func TestGrpcTaskEnqueueFail(t *testing.T) {
 		Base: &commonpb.MsgBase{
 			MsgType: commonpb.MsgType_LoadPartitions,
 		},
-		CollectionID: defaultCollectionID,
-		PartitionIDs: []UniqueID{defaultPartitionID},
-		Schema:       genDefaultCollectionSchema(false),
+		CollectionID:  defaultCollectionID,
+		PartitionIDs:  []UniqueID{defaultPartitionID},
+		Schema:        genDefaultCollectionSchema(false),
+		ReplicaNumber: 1,
 	})
 
 	assert.Equal(t, commonpb.ErrorCode_Success, status.ErrorCode)
@@ -610,9 +614,10 @@ func TestGrpcTaskBeforeHealthy(t *testing.T) {
 			Base: &commonpb.MsgBase{
 				MsgType: commonpb.MsgType_LoadPartitions,
 			},
-			CollectionID: defaultCollectionID,
-			PartitionIDs: []UniqueID{defaultPartitionID},
-			Schema:       genDefaultCollectionSchema(false),
+			CollectionID:  defaultCollectionID,
+			PartitionIDs:  []UniqueID{defaultPartitionID},
+			Schema:        genDefaultCollectionSchema(false),
+			ReplicaNumber: 1,
 		})
 		assert.Equal(t, commonpb.ErrorCode_UnexpectedError, status.ErrorCode)
 		assert.Nil(t, err)
@@ -839,9 +844,10 @@ func Test_LoadCollectionAndLoadPartitions(t *testing.T) {
 		Base: &commonpb.MsgBase{
 			MsgType: commonpb.MsgType_LoadPartitions,
 		},
-		CollectionID: defaultCollectionID,
-		PartitionIDs: []UniqueID{defaultPartitionID},
-		Schema:       genDefaultCollectionSchema(false),
+		CollectionID:  defaultCollectionID,
+		PartitionIDs:  []UniqueID{defaultPartitionID},
+		Schema:        genDefaultCollectionSchema(false),
+		ReplicaNumber: 1,
 	}
 
 	//first load defaultCollectionID
@@ -875,9 +881,10 @@ func Test_RepeatedLoadSamePartitions(t *testing.T) {
 		Base: &commonpb.MsgBase{
 			MsgType: commonpb.MsgType_LoadPartitions,
 		},
-		CollectionID: defaultCollectionID,
-		PartitionIDs: []UniqueID{defaultPartitionID},
-		Schema:       genDefaultCollectionSchema(false),
+		CollectionID:  defaultCollectionID,
+		PartitionIDs:  []UniqueID{defaultPartitionID},
+		Schema:        genDefaultCollectionSchema(false),
+		ReplicaNumber: 1,
 	}
 
 	//first load defaultPartitionID
@@ -911,9 +918,10 @@ func Test_RepeatedLoadDifferentPartitions(t *testing.T) {
 		Base: &commonpb.MsgBase{
 			MsgType: commonpb.MsgType_LoadPartitions,
 		},
-		CollectionID: defaultCollectionID,
-		PartitionIDs: []UniqueID{defaultPartitionID},
-		Schema:       genDefaultCollectionSchema(false),
+		CollectionID:  defaultCollectionID,
+		PartitionIDs:  []UniqueID{defaultPartitionID},
+		Schema:        genDefaultCollectionSchema(false),
+		ReplicaNumber: 1,
 	}
 
 	//first load defaultPartitionID
@@ -927,9 +935,10 @@ func Test_RepeatedLoadDifferentPartitions(t *testing.T) {
 		Base: &commonpb.MsgBase{
 			MsgType: commonpb.MsgType_LoadPartitions,
 		},
-		CollectionID: defaultCollectionID,
-		PartitionIDs: []UniqueID{defaultPartitionID + 1},
-		Schema:       genDefaultCollectionSchema(false),
+		CollectionID:  defaultCollectionID,
+		PartitionIDs:  []UniqueID{defaultPartitionID + 1},
+		Schema:        genDefaultCollectionSchema(false),
+		ReplicaNumber: 1,
 	}
 	status, err = queryCoord.LoadPartitions(ctx, failLoadRequest)
 	assert.Equal(t, commonpb.ErrorCode_UnexpectedError, status.ErrorCode)
@@ -964,9 +973,10 @@ func Test_LoadPartitionsAndLoadCollection(t *testing.T) {
 		Base: &commonpb.MsgBase{
 			MsgType: commonpb.MsgType_LoadPartitions,
 		},
-		CollectionID: defaultCollectionID,
-		PartitionIDs: []UniqueID{defaultPartitionID},
-		Schema:       genDefaultCollectionSchema(false),
+		CollectionID:  defaultCollectionID,
+		PartitionIDs:  []UniqueID{defaultPartitionID},
+		Schema:        genDefaultCollectionSchema(false),
+		ReplicaNumber: 1,
 	}
 
 	//first load defaultPartitionID
@@ -1043,9 +1053,10 @@ func Test_LoadAndReleasePartitions(t *testing.T) {
 		Base: &commonpb.MsgBase{
 			MsgType: commonpb.MsgType_LoadPartitions,
 		},
-		CollectionID: defaultCollectionID,
-		PartitionIDs: []UniqueID{defaultPartitionID},
-		Schema:       genDefaultCollectionSchema(false),
+		CollectionID:  defaultCollectionID,
+		PartitionIDs:  []UniqueID{defaultPartitionID},
+		Schema:        genDefaultCollectionSchema(false),
+		ReplicaNumber: 1,
 	}
 
 	releasePartitionReq := &querypb.ReleasePartitionsRequest{
@@ -1131,9 +1142,10 @@ func Test_LoadPartitionsAndReleaseCollection(t *testing.T) {
 		Base: &commonpb.MsgBase{
 			MsgType: commonpb.MsgType_LoadPartitions,
 		},
-		CollectionID: defaultCollectionID,
-		PartitionIDs: []UniqueID{defaultPartitionID},
-		Schema:       genDefaultCollectionSchema(false),
+		CollectionID:  defaultCollectionID,
+		PartitionIDs:  []UniqueID{defaultPartitionID},
+		Schema:        genDefaultCollectionSchema(false),
+		ReplicaNumber: 1,
 	}
 	releaseCollectionReq := &querypb.ReleaseCollectionRequest{
 		Base: &commonpb.MsgBase{
@@ -1221,9 +1233,10 @@ func Test_RepeatedReleaseSamePartitions(t *testing.T) {
 		Base: &commonpb.MsgBase{
 			MsgType: commonpb.MsgType_LoadPartitions,
 		},
-		CollectionID: defaultCollectionID,
-		PartitionIDs: []UniqueID{defaultPartitionID},
-		Schema:       genDefaultCollectionSchema(false),
+		CollectionID:  defaultCollectionID,
+		PartitionIDs:  []UniqueID{defaultPartitionID},
+		Schema:        genDefaultCollectionSchema(false),
+		ReplicaNumber: 1,
 	}
 
 	releasePartitionReq := &querypb.ReleasePartitionsRequest{
@@ -1270,9 +1283,10 @@ func Test_RepeatedReleaseDifferentPartitions(t *testing.T) {
 		Base: &commonpb.MsgBase{
 			MsgType: commonpb.MsgType_LoadPartitions,
 		},
-		CollectionID: defaultCollectionID,
-		PartitionIDs: []UniqueID{defaultPartitionID, defaultPartitionID + 1},
-		Schema:       genDefaultCollectionSchema(false),
+		CollectionID:  defaultCollectionID,
+		PartitionIDs:  []UniqueID{defaultPartitionID, defaultPartitionID + 1},
+		Schema:        genDefaultCollectionSchema(false),
+		ReplicaNumber: 1,
 	}
 
 	releasePartitionReq := &querypb.ReleasePartitionsRequest{
