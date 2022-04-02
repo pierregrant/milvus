@@ -477,7 +477,9 @@ func (m *MetaReplica) addPartitions(collectionID UniqueID, partitionIDs []Unique
 func (m *MetaReplica) releaseCollection(collectionID UniqueID) error {
 	collection, err := m.getCollectionInfoByID(collectionID)
 	if err != nil {
-		return err
+		log.Warn("the collection has been released",
+			zap.Int64("collectionID", collectionID))
+		return nil
 	}
 
 	err = removeCollectionMeta(collectionID, collection.ReplicaIds, m.client)
