@@ -582,9 +582,10 @@ func TestLoadBalanceSegmentLoop(t *testing.T) {
 			Base: &commonpb.MsgBase{
 				MsgType: commonpb.MsgType_LoadPartitions,
 			},
-			CollectionID: defaultCollectionID,
-			PartitionIDs: []UniqueID{partitionID},
-			Schema:       genDefaultCollectionSchema(false),
+			CollectionID:  defaultCollectionID,
+			PartitionIDs:  []UniqueID{partitionID},
+			Schema:        genDefaultCollectionSchema(false),
+			ReplicaNumber: 1,
 		}
 		baseTask := newBaseTask(baseCtx, querypb.TriggerCondition_GrpcRequest)
 		loadPartitionTask := &loadPartitionTask{
