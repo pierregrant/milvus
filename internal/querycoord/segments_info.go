@@ -45,8 +45,6 @@ func newSegmentsInfo(kv kv.TxnKV) *segmentsInfo {
 func (s *segmentsInfo) loadSegments() error {
 	var err error
 	s.loadOnce.Do(func() {
-		//s.mu.Lock()
-		//defer s.mu.Unlock()
 		var values []string
 		_, values, err = s.kv.LoadWithPrefix(util.SegmentMetaPrefix)
 		if err != nil {

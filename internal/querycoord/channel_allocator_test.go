@@ -18,6 +18,8 @@ package querycoord
 
 import (
 	"context"
+	"math/rand"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -41,7 +43,12 @@ func TestShuffleChannelsToQueryNode(t *testing.T) {
 	clusterSession := sessionutil.NewSession(context.Background(), Params.EtcdCfg.MetaRootPath, etcdCli)
 	clusterSession.Init(typeutil.QueryCoordRole, Params.QueryCoordCfg.Address, true, false)
 	clusterSession.Register()
-	meta, err := newMeta(baseCtx, kv, nil, nil)
+	id := UniqueID(rand.Int31())
+	idAllocator := func() (UniqueID, error) {
+		newID := atomic.AddInt64(&id, 1)
+		return newID, nil
+	}
+	meta, err := newMeta(baseCtx, kv, nil, idAllocator)
 	assert.Nil(t, err)
 	cluster := &queryNodeCluster{
 		ctx:         baseCtx,
