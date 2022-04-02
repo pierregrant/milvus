@@ -353,6 +353,10 @@ func (lct *loadCollectionTask) updateTaskProcess() {
 }
 
 func (lct *loadCollectionTask) preExecute(ctx context.Context) error {
+	if lct.ReplicaNumber <= 0 {
+		lct.ReplicaNumber = 1
+	}
+	
 	collectionID := lct.CollectionID
 	schema := lct.Schema
 	lct.setResultInfo(nil)

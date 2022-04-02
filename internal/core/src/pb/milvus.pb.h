@@ -3884,6 +3884,7 @@ class LoadPartitionsRequest :
     kDbNameFieldNumber = 2,
     kCollectionNameFieldNumber = 3,
     kBaseFieldNumber = 1,
+    kReplicaNumberFieldNumber = 5,
   };
   // repeated string partition_names = 4;
   int partition_names_size() const;
@@ -3932,6 +3933,11 @@ class LoadPartitionsRequest :
   ::milvus::proto::common::MsgBase* mutable_base();
   void set_allocated_base(::milvus::proto::common::MsgBase* base);
 
+  // int32 replica_number = 5;
+  void clear_replica_number();
+  ::PROTOBUF_NAMESPACE_ID::int32 replica_number() const;
+  void set_replica_number(::PROTOBUF_NAMESPACE_ID::int32 value);
+
   // @@protoc_insertion_point(class_scope:milvus.proto.milvus.LoadPartitionsRequest)
  private:
   class _Internal;
@@ -3941,6 +3947,7 @@ class LoadPartitionsRequest :
   ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr db_name_;
   ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr collection_name_;
   ::milvus::proto::common::MsgBase* base_;
+  ::PROTOBUF_NAMESPACE_ID::int32 replica_number_;
   mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   friend struct ::TableStruct_milvus_2eproto;
 };
@@ -19961,6 +19968,20 @@ inline void DescribeSegmentResponse::set_fieldid(::PROTOBUF_NAMESPACE_ID::int64 
   
   fieldid_ = value;
   // @@protoc_insertion_point(field_set:milvus.proto.milvus.DescribeSegmentResponse.fieldID)
+}
+
+// int32 replica_number = 5;
+inline void LoadPartitionsRequest::clear_replica_number() {
+  replica_number_ = 0;
+}
+inline ::PROTOBUF_NAMESPACE_ID::int32 LoadPartitionsRequest::replica_number() const {
+  // @@protoc_insertion_point(field_get:milvus.proto.milvus.LoadPartitionsRequest.replica_number)
+  return replica_number_;
+}
+inline void LoadPartitionsRequest::set_replica_number(::PROTOBUF_NAMESPACE_ID::int32 value) {
+  
+  replica_number_ = value;
+  // @@protoc_insertion_point(field_set:milvus.proto.milvus.LoadPartitionsRequest.replica_number)
 }
 
 // -------------------------------------------------------------------
