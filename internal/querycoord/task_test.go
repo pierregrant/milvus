@@ -222,8 +222,8 @@ func genLoadSegmentTask(ctx context.Context, queryCoord *QueryCoord, nodeID int6
 		Base: &commonpb.MsgBase{
 			MsgType: commonpb.MsgType_LoadCollection,
 		},
-		CollectionID: defaultCollectionID,
-		Schema:       genDefaultCollectionSchema(false),
+		CollectionID:  defaultCollectionID,
+		Schema:        genDefaultCollectionSchema(false),
 		ReplicaNumber: 1,
 	}
 	baseParentTask := newBaseTask(ctx, querypb.TriggerCondition_GrpcRequest)
@@ -874,6 +874,7 @@ func TestLoadBalanceSegmentsTask(t *testing.T) {
 					MsgType: commonpb.MsgType_LoadBalanceSegments,
 				},
 				SourceNodeIDs: []int64{node1.queryNodeID},
+				CollectionID:  defaultCollectionID,
 			},
 			broker:  queryCoord.broker,
 			cluster: queryCoord.cluster,

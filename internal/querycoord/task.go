@@ -1785,9 +1785,10 @@ func (ht *handoffTask) rollBack(ctx context.Context) []task {
 type loadBalanceTask struct {
 	*baseTask
 	*querypb.LoadBalanceRequest
-	broker  *globalMetaBroker
-	cluster Cluster
-	meta    Meta
+	broker    *globalMetaBroker
+	cluster   Cluster
+	meta      Meta
+	replicaID int64
 }
 
 func (lbt *loadBalanceTask) msgBase() *commonpb.MsgBase {
@@ -1851,6 +1852,23 @@ func (lbt *loadBalanceTask) checkForManualLoadBalance() error {
 			return err
 		}
 	}
+
+	if replicaID == -1 {
+		return errors.New("source nodes is empty")
+	}
+
+	for _, nodeID := range lbt.DstNodeIDs {
+		replica, err := lbt.getReplica(nodeID, collectionID)
+		if err != nil {
+			return err
+		}
+		if replicaID != replica.GetReplicaID() {
+			err := errors.New("source nodes and destination nodes must be in the same replica group")
+			return err
+		}
+	}
+
+	lbt.replicaID = replicaID
 
 	log.Debug("start do loadBalanceTask",
 		zap.Int32("trigger type", int32(lbt.triggerCondition)),
@@ -2121,7 +2139,7 @@ func (lbt *loadBalanceTask) execute(ctx context.Context) error {
 				return err
 			}
 		}
-		internalTasks, err := assignInternalTask(ctx, lbt, lbt.meta, lbt.cluster, loadSegmentReqs, nil, false, lbt.SourceNodeIDs, lbt.DstNodeIDs, -1)
+		internalTasks, err := assignInternalTask(ctx, lbt, lbt.meta, lbt.cluster, loadSegmentReqs, nil, false, lbt.SourceNodeIDs, lbt.DstNodeIDs, lbt.replicaID)
 		if err != nil {
 			log.Error("loadBalanceTask: assign child task failed", zap.Any("balance request", lbt.LoadBalanceRequest))
 			lbt.setResultInfo(err)
