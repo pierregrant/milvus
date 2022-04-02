@@ -2117,7 +2117,7 @@ func (lbt *loadBalanceTask) getReplica(nodeID, collectionID int64) (*querypb.Rep
 			return replica, nil
 		}
 	}
-	return nil, fmt.Errorf("unable to find replica", zap.Int64("nodeID", nodeID), zap.Int64("collectionID", collectionID))
+	return nil, fmt.Errorf("unable to find replicas of collection %d and node %d", collectionID, nodeID)
 }
 
 func (lbt *loadBalanceTask) postExecute(context.Context) error {
