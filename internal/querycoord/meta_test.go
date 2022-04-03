@@ -367,6 +367,11 @@ func TestReloadMetaFromKV(t *testing.T) {
 	assert.Equal(t, true, ok)
 	segment := meta.segmentsInfo.getSegment(defaultSegmentID)
 	assert.NotNil(t, segment)
+
+	replicas, err := meta.getReplicasByCollectionID(collectionInfo.CollectionID)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(replicas))
+	assert.Equal(t, collectionInfo.CollectionID, replicas[0].CollectionID)
 }
 
 func TestCreateQueryChannel(t *testing.T) {

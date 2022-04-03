@@ -301,9 +301,15 @@ func TestTriggerTask(t *testing.T) {
 	queryCoord, err := startQueryCoord(ctx)
 	assert.Nil(t, err)
 
-	node, err := startQueryNodeServer(ctx)
+	node1, err := startQueryNodeServer(ctx)
 	assert.Nil(t, err)
-	waitQueryNodeOnline(queryCoord.cluster, node.queryNodeID)
+	node2, err := startQueryNodeServer(ctx)
+	assert.Nil(t, err)
+	node3, err := startQueryNodeServer(ctx)
+	assert.Nil(t, err)
+	waitQueryNodeOnline(queryCoord.cluster, node1.queryNodeID)
+	waitQueryNodeOnline(queryCoord.cluster, node2.queryNodeID)
+	waitQueryNodeOnline(queryCoord.cluster, node3.queryNodeID)
 
 	t.Run("Test LoadCollection", func(t *testing.T) {
 		loadCollectionTask := genLoadCollectionTask(ctx, queryCoord)
@@ -332,10 +338,38 @@ func TestTriggerTask(t *testing.T) {
 		assert.Nil(t, err)
 	})
 
-	err = node.stop()
-	queryCoord.Stop()
-	err = removeAllSession()
-	assert.Nil(t, err)
+	t.Run("Test LoadCollection With Replicas", func(t *testing.T) {
+		loadCollectionTask := genLoadCollectionTask(ctx, queryCoord)
+		loadCollectionTask.ReplicaNumber = 3
+		err = queryCoord.scheduler.processTask(loadCollectionTask)
+		assert.Nil(t, err)
+	})
+
+	t.Run("Test ReleaseCollection With Replicas", func(t *testing.T) {
+		releaseCollectionTask := genReleaseCollectionTask(ctx, queryCoord)
+		err = queryCoord.scheduler.processTask(releaseCollectionTask)
+		assert.Nil(t, err)
+	})
+
+	t.Run("Test LoadPartition With Replicas", func(t *testing.T) {
+		loadPartitionTask := genLoadPartitionTask(ctx, queryCoord)
+		loadPartitionTask.ReplicaNumber = 3
+		err = queryCoord.scheduler.processTask(loadPartitionTask)
+		assert.Nil(t, err)
+	})
+
+	t.Run("Test ReleasePartition With Replicas", func(t *testing.T) {
+		releasePartitionTask := genReleaseCollectionTask(ctx, queryCoord)
+
+		err = queryCoord.scheduler.processTask(releasePartitionTask)
+		assert.Nil(t, err)
+	})
+
+	assert.NoError(t, node1.stop())
+	assert.NoError(t, node2.stop())
+	assert.NoError(t, node3.stop())
+	assert.NoError(t, queryCoord.Stop())
+	assert.NoError(t, removeAllSession())
 }
 
 func Test_LoadCollectionAfterLoadPartition(t *testing.T) {
@@ -441,6 +475,30 @@ func Test_LoadCollectionExecuteFail(t *testing.T) {
 	queryCoord.Stop()
 	err = removeAllSession()
 	assert.Nil(t, err)
+}
+
+func TestLoadCollectionNoEnoughNodeFail(t *testing.T) {
+	refreshParams()
+	ctx := context.Background()
+	queryCoord, err := startQueryCoord(ctx)
+	assert.Nil(t, err)
+
+	node1, err := startQueryNodeServer(ctx)
+	assert.Nil(t, err)
+	node2, err := startQueryNodeServer(ctx)
+	assert.Nil(t, err)
+	waitQueryNodeOnline(queryCoord.cluster, node1.queryNodeID)
+	waitQueryNodeOnline(queryCoord.cluster, node2.queryNodeID)
+
+	loadCollectionTask := genLoadCollectionTask(ctx, queryCoord)
+	loadCollectionTask.ReplicaNumber = 3
+	err = queryCoord.scheduler.processTask(loadCollectionTask)
+	assert.Error(t, err)
+
+	assert.NoError(t, node1.stop())
+	assert.NoError(t, node2.stop())
+	assert.NoError(t, queryCoord.Stop())
+	assert.NoError(t, removeAllSession())
 }
 
 func Test_LoadPartitionAssignTaskFail(t *testing.T) {
