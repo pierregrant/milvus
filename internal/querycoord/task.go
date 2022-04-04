@@ -363,7 +363,8 @@ func (lct *loadCollectionTask) preExecute(ctx context.Context) error {
 	log.Debug("start do loadCollectionTask",
 		zap.Int64("msgID", lct.getTaskID()),
 		zap.Int64("collectionID", collectionID),
-		zap.Stringer("schema", schema))
+		zap.Stringer("schema", schema),
+		zap.Int32("replicaNumber", lct.ReplicaNumber))
 	return nil
 }
 

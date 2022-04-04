@@ -867,6 +867,119 @@ func Test_LoadCollectionAndLoadPartitions(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func Test_LoadCollectionWithReplicas(t *testing.T) {
+	refreshParams()
+	ctx := context.Background()
+	queryCoord, err := startQueryCoord(ctx)
+	assert.Nil(t, err)
+
+	node1, err := startQueryNodeServer(ctx)
+	assert.Nil(t, err)
+	node2, err := startQueryNodeServer(ctx)
+	assert.Nil(t, err)
+
+	waitQueryNodeOnline(queryCoord.cluster, node1.queryNodeID)
+	waitQueryNodeOnline(queryCoord.cluster, node2.queryNodeID)
+	loadCollectionReq := &querypb.LoadCollectionRequest{
+		Base: &commonpb.MsgBase{
+			MsgType: commonpb.MsgType_LoadCollection,
+		},
+		CollectionID:  defaultCollectionID,
+		Schema:        genDefaultCollectionSchema(false),
+		ReplicaNumber: 3,
+	}
+
+	// load collection with 3 replicas, but no enough querynodes
+	assert.Equal(t, 2, len(queryCoord.cluster.onlineNodeIDs()))
+	status, err := queryCoord.LoadCollection(ctx, loadCollectionReq)
+	assert.NoError(t, err)
+	assert.Equal(t, commonpb.ErrorCode_UnexpectedError, status.ErrorCode)
+
+	// Now it should can load collection with 3 replicas
+	node3, err := startQueryNodeServer(ctx)
+	assert.Nil(t, err)
+	waitQueryNodeOnline(queryCoord.cluster, node3.queryNodeID)
+
+	status, err = queryCoord.LoadCollection(ctx, loadCollectionReq)
+	assert.NoError(t, err)
+	assert.Equal(t, commonpb.ErrorCode_Success, status.ErrorCode)
+	waitLoadCollectionDone(ctx, queryCoord, defaultCollectionID)
+
+	status, err = queryCoord.ReleaseCollection(ctx, &querypb.ReleaseCollectionRequest{
+		Base: &commonpb.MsgBase{
+			MsgType: commonpb.MsgType_ReleaseCollection,
+		},
+		CollectionID: loadCollectionReq.CollectionID,
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, commonpb.ErrorCode_Success, status.ErrorCode)
+
+	node1.stop()
+	node2.stop()
+	node3.stop()
+	queryCoord.Stop()
+	err = removeAllSession()
+	assert.Nil(t, err)
+}
+
+func Test_LoadPartitionsWithReplicas(t *testing.T) {
+	refreshParams()
+	ctx := context.Background()
+	queryCoord, err := startQueryCoord(ctx)
+	assert.Nil(t, err)
+
+	node1, err := startQueryNodeServer(ctx)
+	assert.Nil(t, err)
+	node2, err := startQueryNodeServer(ctx)
+	assert.Nil(t, err)
+
+	waitQueryNodeOnline(queryCoord.cluster, node1.queryNodeID)
+	waitQueryNodeOnline(queryCoord.cluster, node2.queryNodeID)
+	loadPartitionsReq := &querypb.LoadPartitionsRequest{
+		Base: &commonpb.MsgBase{
+			MsgType: commonpb.MsgType_LoadPartitions,
+		},
+		CollectionID:  defaultCollectionID,
+		PartitionIDs:  []UniqueID{defaultPartitionID},
+		Schema:        genDefaultCollectionSchema(false),
+		ReplicaNumber: 3,
+	}
+
+	// load collection with 3 replicas, but no enough querynodes
+	assert.Equal(t, 2, len(queryCoord.cluster.onlineNodeIDs()))
+	status, err := queryCoord.LoadPartitions(ctx, loadPartitionsReq)
+	assert.NoError(t, err)
+	assert.Equal(t, commonpb.ErrorCode_UnexpectedError, status.ErrorCode)
+
+	// Now it should can load collection with 3 replicas
+	node3, err := startQueryNodeServer(ctx)
+	assert.Nil(t, err)
+	waitQueryNodeOnline(queryCoord.cluster, node3.queryNodeID)
+
+	status, err = queryCoord.LoadPartitions(ctx, loadPartitionsReq)
+	assert.NoError(t, err)
+	assert.Equal(t, commonpb.ErrorCode_Success, status.ErrorCode)
+	waitLoadPartitionDone(ctx, queryCoord,
+		loadPartitionsReq.CollectionID, loadPartitionsReq.PartitionIDs)
+
+	status, err = queryCoord.ReleasePartitions(ctx, &querypb.ReleasePartitionsRequest{
+		Base: &commonpb.MsgBase{
+			MsgType: commonpb.MsgType_ReleaseCollection,
+		},
+		CollectionID: loadPartitionsReq.CollectionID,
+		PartitionIDs: loadPartitionsReq.PartitionIDs,
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, commonpb.ErrorCode_Success, status.ErrorCode)
+
+	node1.stop()
+	node2.stop()
+	node3.stop()
+	queryCoord.Stop()
+	err = removeAllSession()
+	assert.Nil(t, err)
+}
+
 func Test_RepeatedLoadSamePartitions(t *testing.T) {
 	refreshParams()
 	ctx := context.Background()
