@@ -177,7 +177,7 @@ func TestWatchNodeLoop(t *testing.T) {
 		}
 		collectionBlobs, err := proto.Marshal(collectionInfo)
 		assert.Nil(t, err)
-		nodeKey := fmt.Sprintf("%s/%d", collectionMetaPrefix, 100)
+		nodeKey := fmt.Sprintf("%s/%d", collectionMetaPrefix, defaultCollectionID)
 		kvs[nodeKey] = string(collectionBlobs)
 
 		err = kv.MultiSave(kvs)

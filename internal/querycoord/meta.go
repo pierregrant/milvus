@@ -162,6 +162,8 @@ func newMeta(ctx context.Context, kv kv.MetaKv, factory msgstream.Factory, idAll
 
 func (m *MetaReplica) reloadFromKV() error {
 	log.Debug("start reload from kv")
+
+	log.Info("recovery collections...")
 	collectionKeys, collectionValues, err := m.client.LoadWithPrefix(collectionMetaPrefix)
 	if err != nil {
 		return err
@@ -177,6 +179,9 @@ func (m *MetaReplica) reloadFromKV() error {
 			return err
 		}
 		m.collectionInfos[collectionID] = collectionInfo
+
+		log.Debug("recovery collection",
+			zap.Int64("collectionID", collectionID))
 	}
 	metrics.QueryCoordNumCollections.WithLabelValues().Set(float64(len(m.collectionInfos)))
 
@@ -253,12 +258,9 @@ func (m *MetaReplica) reloadFromKV() error {
 
 			err = m.addReplica(replica)
 			if err != nil {
-				return err
-			}
-			// Rewrite collection info
-			collectionInfo.ReplicaIds = append(collectionInfo.ReplicaIds, replica.ReplicaID)
-			err = saveGlobalCollectionInfo(collectionInfo.CollectionID, collectionInfo, m.client)
-			if err != nil {
+				log.Error("failed to add replica for old collection info format without replicas info",
+					zap.Int64("collectionID", replica.CollectionID),
+					zap.Error(err))
 				return err
 			}
 
@@ -865,7 +867,7 @@ func (m *MetaReplica) getCollectionInfoByID(collectionID UniqueID) (*querypb.Col
 		return proto.Clone(info).(*querypb.CollectionInfo), nil
 	}
 
-	return nil, errors.New("getCollectionInfoByID: can't find collectionID in collectionInfo")
+	return nil, fmt.Errorf("getCollectionInfoByID: can't find collectionID=%v in collectionInfo", collectionID)
 }
 
 func (m *MetaReplica) getPartitionStatesByID(collectionID UniqueID, partitionID UniqueID) (*querypb.PartitionStates, error) {
@@ -1164,8 +1166,25 @@ func (m *MetaReplica) generateReplica(collectionID int64, partitionIds []int64) 
 	}, nil
 }
 
-func (m *MetaReplica) addReplica(replica *milvuspb.ReplicaInfo) error {
-	err := saveReplicaInfo(replica, m.client)
+func (m *MetaReplica) addReplica(replica *querypb.ReplicaInfo) error {
+	collectionInfo, err := m.getCollectionInfoByID(replica.CollectionID)
+	if err != nil {
+		return err
+	}
+
+	collectionInfo.ReplicaIds = append(collectionInfo.ReplicaIds, replica.ReplicaID)
+	collectionInfo.ReplicaNumber++
+
+	err = saveGlobalCollectionInfo(collectionInfo.CollectionID, collectionInfo, m.client)
+	if err != nil {
+		return err
+	}
+
+	m.collectionMu.Lock()
+	m.collectionInfos[collectionInfo.CollectionID] = collectionInfo
+	m.collectionMu.Unlock()
+
+	err = saveReplicaInfo(replica, m.client)
 	if err != nil {
 		return err
 	}

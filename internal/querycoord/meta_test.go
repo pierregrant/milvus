@@ -363,8 +363,10 @@ func TestReloadMetaFromKV(t *testing.T) {
 
 	assert.Equal(t, 1, len(meta.collectionInfos))
 	assert.Equal(t, 1, len(meta.segmentsInfo.getSegments()))
-	_, ok := meta.collectionInfos[defaultCollectionID]
-	assert.Equal(t, true, ok)
+	collectionInfo, err = meta.getCollectionInfoByID(collectionInfo.CollectionID)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(collectionInfo.ReplicaIds))
+	assert.Equal(t, int32(1), collectionInfo.ReplicaNumber)
 	segment := meta.segmentsInfo.getSegment(defaultSegmentID)
 	assert.NotNil(t, segment)
 
