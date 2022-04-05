@@ -263,6 +263,11 @@ func (w *watchDmChannelsTask) Execute(ctx context.Context) error {
 	sCol := w.node.streaming.replica.addCollection(collectionID, w.req.Schema)
 	hCol := w.node.historical.replica.addCollection(collectionID, w.req.Schema)
 
+	//add shard cluster
+	for _, vchannel := range vChannels {
+		w.node.ShardClusterService.addShardCluster(w.req.GetCollectionID(), w.req.GetReplicaID(), vchannel)
+	}
+
 	// load growing segments
 	unFlushedSegments := make([]*queryPb.SegmentLoadInfo, 0)
 	unFlushedSegmentIDs := make([]UniqueID, 0)

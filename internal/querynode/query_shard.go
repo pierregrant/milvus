@@ -42,9 +42,9 @@ type queryShard struct {
 	channel      Channel
 	replicaID    int64
 
-	cluster    *ShardCluster
-	historical *historical
-	streaming  *streaming
+	clusterService *ShardClusterService
+	historical     *historical
+	streaming      *streaming
 
 	localChunkManager  storage.ChunkManager
 	remoteChunkManager storage.ChunkManager
@@ -58,7 +58,7 @@ func newQueryShard(
 	collectionID UniqueID,
 	channel Channel,
 	replicaID int64,
-	cluster *ShardCluster,
+	clusterService *ShardClusterService,
 	historical *historical,
 	streaming *streaming,
 	localChunkManager storage.ChunkManager,
@@ -72,7 +72,7 @@ func newQueryShard(
 		collectionID:       collectionID,
 		channel:            channel,
 		replicaID:          replicaID,
-		cluster:            cluster,
+		clusterService:     clusterService,
 		historical:         historical,
 		streaming:          streaming,
 		localChunkManager:  localChunkManager,
@@ -126,11 +126,13 @@ func (q *queryShard) query(ctx context.Context, req *querypb.QueryRequest) (*int
 
 	// check if shard leader b.c only leader receives request with non-empty dml channel
 	if req.DmlChannel != "" {
-		if q.cluster == nil {
-			return nil, errors.New("shard cluster is nil, but received non-empty dml channel")
+		cluster, ok := q.clusterService.getShardCluster(req.GetDmlChannel())
+		if !ok {
+			return nil, fmt.Errorf("channel %s leader is not here", req.GetDmlChannel())
 		}
+
 		// shard leader dispatches request to its shard cluster
-		results, err := q.cluster.Query(ctx, req)
+		results, err := cluster.Query(ctx, req)
 		if err != nil {
 			return nil, err
 		}
