@@ -77,7 +77,7 @@ type segmentEvent struct {
 type shardQueryNode interface {
 	Search(context.Context, *querypb.SearchRequest) (*internalpb.SearchResults, error)
 	Query(context.Context, *querypb.QueryRequest) (*internalpb.RetrieveResults, error)
-	Stop()
+	Stop() error
 }
 
 type shardNode struct {

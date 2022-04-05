@@ -36,12 +36,13 @@ type queryShardService struct {
 	historical *historical
 	streaming  *streaming
 
-	localChunkManager  storage.ChunkManager
-	remoteChunkManager storage.ChunkManager
-	localCacheEnabled  bool
+	shardClusterService *ShardClusterService
+	localChunkManager   storage.ChunkManager
+	remoteChunkManager  storage.ChunkManager
+	localCacheEnabled   bool
 }
 
-func newQueryShardService(ctx context.Context, historical *historical, streaming *streaming) *queryShardService {
+func newQueryShardService(ctx context.Context, historical *historical, streaming *streaming, clusterService *ShardClusterService) *queryShardService {
 	queryShardServiceCtx, queryShardServiceCancel := context.WithCancel(ctx)
 
 	path := Params.LoadWithDefault("localStorage.Path", "/tmp/milvus/data")
@@ -58,19 +59,20 @@ func newQueryShardService(ctx context.Context, historical *historical, streaming
 		storage.CreateBucket(true))
 
 	qss := &queryShardService{
-		ctx:                queryShardServiceCtx,
-		cancel:             queryShardServiceCancel,
-		queryShards:        make(map[Channel]*queryShard),
-		historical:         historical,
-		streaming:          streaming,
-		localChunkManager:  localChunkManager,
-		remoteChunkManager: remoteChunkManager,
-		localCacheEnabled:  localCacheEnabled,
+		ctx:                 queryShardServiceCtx,
+		cancel:              queryShardServiceCancel,
+		queryShards:         make(map[Channel]*queryShard),
+		historical:          historical,
+		streaming:           streaming,
+		shardClusterService: clusterService,
+		localChunkManager:   localChunkManager,
+		remoteChunkManager:  remoteChunkManager,
+		localCacheEnabled:   localCacheEnabled,
 	}
 	return qss
 }
 
-func (q *queryShardService) addQueryShard(collectionID UniqueID, channel Channel, replicaID int64) error {
+func (q *queryShardService) addQueryShard(collectionID UniqueID, channel Channel, replicaID int64, cluster *ShardCluster) error {
 	q.queryShardsMu.Lock()
 	defer q.queryShardsMu.Unlock()
 	if _, ok := q.queryShards[channel]; ok {
@@ -81,7 +83,7 @@ func (q *queryShardService) addQueryShard(collectionID UniqueID, channel Channel
 		collectionID,
 		channel,
 		replicaID,
-		nil,
+		q.shardClusterService,
 		q.historical,
 		q.streaming,
 		q.localChunkManager,

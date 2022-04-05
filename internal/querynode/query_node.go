@@ -119,6 +119,11 @@ type QueryNode struct {
 	vectorStorage storage.ChunkManager
 	cacheStorage  storage.ChunkManager
 	etcdKV        *etcdkv.EtcdKV
+
+	// shard cluster service, handle shard leader functions
+	ShardClusterService *ShardClusterService
+	//shard query service, handles shard-level query & search
+	queryShardService *queryShardService
 }
 
 // NewQueryNode will return a QueryNode with abnormal state.
@@ -363,6 +368,11 @@ func (node *QueryNode) Start() error {
 
 	node.wg.Add(1)
 	go node.watchService(node.queryNodeLoopCtx)
+
+	// create shardClusterService for shardLeader functions.
+	node.ShardClusterService = newShardClusterService(node.etcdCli, node.session)
+	// create shard-level query service
+	node.queryShardService = newQueryShardService(node.queryNodeLoopCtx, node.historical, node.streaming)
 
 	Params.QueryNodeCfg.CreatedTime = time.Now()
 	Params.QueryNodeCfg.UpdatedTime = time.Now()

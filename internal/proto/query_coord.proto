@@ -201,6 +201,7 @@ message WatchDmChannelsRequest {
   schema.CollectionSchema schema = 6;
   repeated data.SegmentInfo exclude_infos = 7;
   LoadMetaInfo load_meta = 8;
+  int64 replicaID = 9;
 }
 
 message WatchDeltaChannelsRequest {
