@@ -27,7 +27,6 @@ import (
 	"github.com/milvus-io/milvus/internal/proto/commonpb"
 	"github.com/milvus-io/milvus/internal/proto/etcdpb"
 	"github.com/milvus-io/milvus/internal/proto/internalpb"
-	"github.com/milvus-io/milvus/internal/proto/milvuspb"
 	"github.com/milvus-io/milvus/internal/proto/querypb"
 	"github.com/milvus-io/milvus/internal/proto/schemapb"
 	"github.com/milvus-io/milvus/internal/storage"
@@ -83,7 +82,7 @@ func newQueryShard(
 	return qs
 }
 
-func (q *queryShard) search(ctx context.Context, req *querypb.SearchRequest) (*milvuspb.SearchResults, error) {
+func (q *queryShard) search(ctx context.Context, req *querypb.SearchRequest) (*internalpb.SearchResults, error) {
 	return nil, errors.New("not implemented")
 }
 
@@ -124,8 +123,8 @@ func (q *queryShard) query(ctx context.Context, req *querypb.QueryRequest) (*int
 		}
 	}
 
-	// check if shard leader b.c only leader receives request with non-empty dml channel
-	if req.DmlChannel != "" {
+	// check if shard leader b.c only leader receives request with no segment specified
+	if len(req.GetSegmentIDs()) == 0 {
 		cluster, ok := q.clusterService.getShardCluster(req.GetDmlChannel())
 		if !ok {
 			return nil, fmt.Errorf("channel %s leader is not here", req.GetDmlChannel())

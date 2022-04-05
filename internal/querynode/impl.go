@@ -18,7 +18,6 @@ package querynode
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"go.uber.org/zap"
@@ -566,7 +565,31 @@ func (node *QueryNode) Search(ctx context.Context, req *queryPb.SearchRequest) (
 		}, nil
 	}
 
-	return nil, errors.New("not implemented")
+	log.Debug("Received QueryRequest", zap.String("vchannel", req.GetDmlChannel()), zap.Int64s("segmentIDs", req.GetSegmentIDs()))
+
+	qs, err := node.queryShardService.getQueryShard(req.GetDmlChannel())
+	if err != nil {
+		return &internalpb.SearchResults{
+			Status: &commonpb.Status{
+				ErrorCode: commonpb.ErrorCode_UnexpectedError,
+				Reason:    err.Error(),
+			},
+		}, nil
+	}
+
+	results, err := qs.search(ctx, req)
+	if err != nil {
+		log.Warn("QueryService failed to query", zap.String("vchannel", req.GetDmlChannel()), zap.Int64s("segmentIDs", req.GetSegmentIDs()))
+		return &internalpb.SearchResults{
+			Status: &commonpb.Status{
+				ErrorCode: commonpb.ErrorCode_UnexpectedError,
+				Reason:    err.Error(),
+			},
+		}, nil
+	}
+	log.Debug("Query Shard Done", zap.String("vchannel", req.GetDmlChannel()), zap.Int64s("segmentIDs", req.GetSegmentIDs()))
+
+	return results, err
 }
 
 // Query performs replica query tasks.
@@ -579,8 +602,31 @@ func (node *QueryNode) Query(ctx context.Context, req *queryPb.QueryRequest) (*i
 			},
 		}, nil
 	}
+	log.Debug("Received QueryRequest", zap.String("vchannel", req.GetDmlChannel()), zap.Int64s("segmentIDs", req.GetSegmentIDs()))
 
-	return nil, errors.New("not implemented")
+	qs, err := node.queryShardService.getQueryShard(req.GetDmlChannel())
+	if err != nil {
+		return &internalpb.RetrieveResults{
+			Status: &commonpb.Status{
+				ErrorCode: commonpb.ErrorCode_UnexpectedError,
+				Reason:    err.Error(),
+			},
+		}, nil
+	}
+
+	results, err := qs.query(ctx, req)
+	if err != nil {
+		log.Warn("QueryService failed to query", zap.String("vchannel", req.GetDmlChannel()), zap.Int64s("segmentIDs", req.GetSegmentIDs()))
+		return &internalpb.RetrieveResults{
+			Status: &commonpb.Status{
+				ErrorCode: commonpb.ErrorCode_UnexpectedError,
+				Reason:    err.Error(),
+			},
+		}, nil
+	}
+	log.Debug("Query Shard Done", zap.String("vchannel", req.GetDmlChannel()), zap.Int64s("segmentIDs", req.GetSegmentIDs()))
+
+	return results, nil
 }
 
 // GetMetrics return system infos of the query node, such as total memory, memory usage, cpu usage ...
