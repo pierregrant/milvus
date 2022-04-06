@@ -60,7 +60,7 @@ type Meta interface {
 	showCollections() []*querypb.CollectionInfo
 	hasCollection(collectionID UniqueID) bool
 	getCollectionInfoByID(collectionID UniqueID) (*querypb.CollectionInfo, error)
-	addCollection(collectionID UniqueID, loadType querypb.LoadType, schema *schemapb.CollectionSchema, replicas []UniqueID) error
+	addCollection(collectionID UniqueID, loadType querypb.LoadType, schema *schemapb.CollectionSchema) error
 	releaseCollection(collectionID UniqueID) error
 
 	addPartitions(collectionID UniqueID, partitionIDs []UniqueID) error
@@ -401,7 +401,7 @@ func (m *MetaReplica) hasReleasePartition(collectionID UniqueID, partitionID Uni
 	return false
 }
 
-func (m *MetaReplica) addCollection(collectionID UniqueID, loadType querypb.LoadType, schema *schemapb.CollectionSchema, replicas []UniqueID) error {
+func (m *MetaReplica) addCollection(collectionID UniqueID, loadType querypb.LoadType, schema *schemapb.CollectionSchema) error {
 	hasCollection := m.hasCollection(collectionID)
 	if !hasCollection {
 		var partitionIDs []UniqueID
@@ -412,7 +412,8 @@ func (m *MetaReplica) addCollection(collectionID UniqueID, loadType querypb.Load
 			PartitionStates: partitionStates,
 			LoadType:        loadType,
 			Schema:          schema,
-			ReplicaIds:      replicas,
+			ReplicaIds:      make([]int64, 0),
+			ReplicaNumber:   0,
 		}
 		err := saveGlobalCollectionInfo(collectionID, newCollection, m.client)
 		if err != nil {

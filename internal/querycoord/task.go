@@ -525,7 +525,7 @@ func (lct *loadCollectionTask) execute(ctx context.Context) error {
 		log.Debug("loadCollectionTask: assign child task done", zap.Int64("collectionID", collectionID), zap.Int64("msgID", lct.Base.MsgID))
 	}
 
-	err = lct.meta.addCollection(collectionID, querypb.LoadType_LoadCollection, lct.Schema, replicaIds)
+	err = lct.meta.addCollection(collectionID, querypb.LoadType_LoadCollection, lct.Schema)
 	if err != nil {
 		log.Error("loadCollectionTask: add collection to meta failed", zap.Int64("collectionID", collectionID), zap.Int64("msgID", lct.Base.MsgID), zap.Error(err))
 		lct.setResultInfo(err)
@@ -947,7 +947,7 @@ func (lpt *loadPartitionTask) execute(ctx context.Context) error {
 		log.Debug("loadPartitionTask: assign child task done", zap.Int64("collectionID", collectionID), zap.Int64s("partitionIDs", partitionIDs), zap.Int64("msgID", lpt.Base.MsgID))
 	}
 
-	err = lpt.meta.addCollection(collectionID, querypb.LoadType_LoadPartition, lpt.Schema, replicaIds)
+	err = lpt.meta.addCollection(collectionID, querypb.LoadType_LoadPartition, lpt.Schema)
 	if err != nil {
 		log.Error("loadPartitionTask: add collection to meta failed", zap.Int64("collectionID", collectionID), zap.Int64("msgID", lpt.Base.MsgID), zap.Error(err))
 		lpt.setResultInfo(err)
@@ -2214,7 +2214,7 @@ func assignInternalTask(ctx context.Context,
 	}
 	log.Debug("assignInternalTask: assign segment to node success")
 
-	err = cluster.allocateChannelsToQueryNode(ctx, watchDmChannelRequests, wait, excludeNodeIDs, replicaID)
+	err = cluster.allocateChannelsToQueryNode(ctx, watchDmChannelRequests, wait, excludeNodeIDs, includeNodeIDs, replicaID)
 	if err != nil {
 		log.Error("assignInternalTask: assign dmChannel to node failed", zap.Any("watch dmChannel requests", watchDmChannelRequests))
 		return nil, err

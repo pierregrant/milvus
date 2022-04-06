@@ -77,7 +77,7 @@ func TestReplica_Release(t *testing.T) {
 	}
 	meta, err := newMeta(context.Background(), etcdKV, nil, idAllocator)
 	assert.Nil(t, err)
-	err = meta.addCollection(1, querypb.LoadType_LoadCollection, nil, nil)
+	err = meta.addCollection(1, querypb.LoadType_LoadCollection, nil)
 	require.NoError(t, err)
 
 	collections := meta.showCollections()
@@ -182,7 +182,7 @@ func TestMetaFunc(t *testing.T) {
 
 	t.Run("Test AddCollection", func(t *testing.T) {
 		schema := genDefaultCollectionSchema(false)
-		err := meta.addCollection(defaultCollectionID, querypb.LoadType_LoadCollection, schema, nil)
+		err := meta.addCollection(defaultCollectionID, querypb.LoadType_LoadCollection, schema)
 		assert.Nil(t, err)
 	})
 

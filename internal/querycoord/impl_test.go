@@ -24,7 +24,9 @@ import (
 	"time"
 
 	"github.com/milvus-io/milvus/internal/common"
+	"github.com/milvus-io/milvus/internal/log"
 	"github.com/milvus-io/milvus/internal/util/sessionutil"
+	"go.uber.org/zap"
 
 	"github.com/stretchr/testify/assert"
 
@@ -867,7 +869,7 @@ func Test_LoadCollectionAndLoadPartitions(t *testing.T) {
 	assert.Nil(t, err)
 }
 
-func Test_LoadCollectionWithReplicas(t *testing.T) {
+func TestLoadCollectionWithReplicas(t *testing.T) {
 	refreshParams()
 	ctx := context.Background()
 	queryCoord, err := startQueryCoord(ctx)
@@ -904,6 +906,18 @@ func Test_LoadCollectionWithReplicas(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, commonpb.ErrorCode_Success, status.ErrorCode)
 	waitLoadCollectionDone(ctx, queryCoord, defaultCollectionID)
+	replicas, err := queryCoord.meta.getReplicasByCollectionID(loadCollectionReq.CollectionID)
+	assert.NoError(t, err)
+	for i := range replicas {
+		log.Info("replicas",
+			zap.Int64("collectionID", replicas[i].CollectionID),
+			zap.Int64("id", replicas[i].ReplicaID),
+			zap.Int64s("nodeIds", replicas[i].NodeIds))
+	}
+	assert.Equal(t, 3, len(replicas))
+	for i := range replicas {
+		assert.Equal(t, loadCollectionReq.CollectionID, replicas[i].CollectionID)
+	}
 
 	status, err = queryCoord.ReleaseCollection(ctx, &querypb.ReleaseCollectionRequest{
 		Base: &commonpb.MsgBase{
@@ -1431,4 +1445,72 @@ func Test_RepeatedReleaseDifferentPartitions(t *testing.T) {
 	queryCoord.Stop()
 	err = removeAllSession()
 	assert.Nil(t, err)
+}
+
+func TestGetReplicas(t *testing.T) {
+	refreshParams()
+	ctx := context.Background()
+	queryCoord, err := startQueryCoord(ctx)
+	assert.Nil(t, err)
+
+	node1, err := startQueryNodeServer(ctx)
+	assert.Nil(t, err)
+	node2, err := startQueryNodeServer(ctx)
+	assert.Nil(t, err)
+	node3, err := startQueryNodeServer(ctx)
+	assert.Nil(t, err)
+	waitQueryNodeOnline(queryCoord.cluster, node1.queryNodeID)
+	waitQueryNodeOnline(queryCoord.cluster, node2.queryNodeID)
+	waitQueryNodeOnline(queryCoord.cluster, node3.queryNodeID)
+
+	// First, load collection with replicas
+	loadCollectionReq := &querypb.LoadCollectionRequest{
+		Base: &commonpb.MsgBase{
+			MsgType: commonpb.MsgType_LoadCollection,
+		},
+		CollectionID:  defaultCollectionID,
+		Schema:        genDefaultCollectionSchema(false),
+		ReplicaNumber: 3,
+	}
+	status, err := queryCoord.LoadCollection(ctx, loadCollectionReq)
+	assert.NoError(t, err)
+	assert.Equal(t, commonpb.ErrorCode_Success, status.ErrorCode)
+	waitLoadCollectionDone(ctx, queryCoord, defaultCollectionID)
+
+	getReplicasReq := &querypb.GetReplicasRequest{
+		Base:         &commonpb.MsgBase{},
+		CollectionID: loadCollectionReq.CollectionID,
+	}
+	resp, err := queryCoord.GetReplicas(ctx, getReplicasReq)
+	assert.NoError(t, err)
+	assert.Equal(t, commonpb.ErrorCode_Success, resp.Status.ErrorCode)
+	assert.Equal(t, 3, len(resp.Replicas))
+	for i := range resp.Replicas {
+		assert.Equal(t, 1, len(resp.Replicas[i].NodeIds))
+		for j := 0; j < i; j++ {
+			assert.NotEqual(t,
+				resp.Replicas[i].NodeIds[0],
+				resp.Replicas[j].NodeIds[0])
+		}
+	}
+
+	getReplicasReq.WithShardNodes = true
+	resp, err = queryCoord.GetReplicas(ctx, getReplicasReq)
+	assert.NoError(t, err)
+	assert.Equal(t, commonpb.ErrorCode_Success, resp.Status.ErrorCode)
+	assert.Equal(t, 3, len(resp.Replicas))
+	for i := range resp.Replicas {
+		assert.Equal(t, 1, len(resp.Replicas[i].NodeIds))
+		for j := range resp.Replicas[i].ShardReplicas {
+			assert.Equal(t,
+				resp.Replicas[i].NodeIds[0],
+				resp.Replicas[i].ShardReplicas[j].LeaderID)
+		}
+
+		for j := 0; j < i; j++ {
+			assert.NotEqual(t,
+				resp.Replicas[i].NodeIds[0],
+				resp.Replicas[j].NodeIds[0])
+		}
+	}
 }
