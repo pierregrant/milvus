@@ -18,7 +18,6 @@ package querynode
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"go.uber.org/zap"
@@ -569,7 +568,24 @@ func (node *QueryNode) Search(ctx context.Context, req *queryPb.SearchRequest) (
 	log.Debug("Received QueryRequest", zap.String("vchannel", req.GetDmlChannel()), zap.Int64s("segmentIDs", req.GetSegmentIDs()))
 
 	if node.queryShardService == nil {
-		return nil, errors.New("queryShardService is nil")
+		return &internalpb.SearchResults{
+			Status: &commonpb.Status{
+				ErrorCode: commonpb.ErrorCode_UnexpectedError,
+				Reason:    "queryShardService is nil",
+			},
+		}, nil
+	}
+
+	if !node.queryShardService.hasQueryShard(req.GetDmlChannel()) {
+		err := node.queryShardService.addQueryShard(req.Req.CollectionID, req.GetDmlChannel(), 0) // TODO: add replicaID in request or remove it in query shard
+		if err != nil {
+			return &internalpb.SearchResults{
+				Status: &commonpb.Status{
+					ErrorCode: commonpb.ErrorCode_UnexpectedError,
+					Reason:    err.Error(),
+				},
+			}, nil
+		}
 	}
 
 	qs, err := node.queryShardService.getQueryShard(req.GetDmlChannel())
@@ -610,7 +626,24 @@ func (node *QueryNode) Query(ctx context.Context, req *queryPb.QueryRequest) (*i
 	log.Debug("Received QueryRequest", zap.String("vchannel", req.GetDmlChannel()), zap.Int64s("segmentIDs", req.GetSegmentIDs()))
 
 	if node.queryShardService == nil {
-		return nil, errors.New("queryShardService is nil")
+		return &internalpb.RetrieveResults{
+			Status: &commonpb.Status{
+				ErrorCode: commonpb.ErrorCode_UnexpectedError,
+				Reason:    "queryShardService is nil",
+			},
+		}, nil
+	}
+
+	if !node.queryShardService.hasQueryShard(req.GetDmlChannel()) {
+		err := node.queryShardService.addQueryShard(req.Req.CollectionID, req.GetDmlChannel(), 0) // TODO: add replicaID in request or remove it in query shard
+		if err != nil {
+			return &internalpb.RetrieveResults{
+				Status: &commonpb.Status{
+					ErrorCode: commonpb.ErrorCode_UnexpectedError,
+					Reason:    err.Error(),
+				},
+			}, nil
+		}
 	}
 
 	qs, err := node.queryShardService.getQueryShard(req.GetDmlChannel())
