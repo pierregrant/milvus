@@ -1,3 +1,19 @@
+// Licensed to the LF AI & Data foundation under one
+// or more contributor license agreements. See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership. The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License. You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package querynode
 
 import (
@@ -34,12 +50,24 @@ func NewEtcdShardSegmentDetector(client *clientv3.Client, rootPath string) *etcd
 	}
 }
 
+// Close perform closing procedure and notify all watcher to quit.
 func (sd *etcdShardSegmentDetector) Close() {
 	sd.closeOnce.Do(func() {
 		close(sd.closeCh)
 		sd.wg.Wait()
 		close(sd.evtCh)
 	})
+}
+
+func (sd *etcdShardSegmentDetector) afterClose(fn func()) {
+	<-sd.closeCh
+	fn()
+}
+
+func (sd *etcdShardSegmentDetector) getCtx() context.Context {
+	ctx, cancel := context.WithCancel(context.Background())
+	go sd.afterClose(cancel)
+	return ctx
 }
 
 func (sd *etcdShardSegmentDetector) watchSegments(collectionID int64, replicaID int64, vchannelName string) ([]segmentEvent, <-chan segmentEvent) {
@@ -52,7 +80,6 @@ func (sd *etcdShardSegmentDetector) watchSegments(collectionID int64, replicaID 
 	var events []segmentEvent
 	for _, kv := range resp.Kvs {
 		info, err := sd.parseSegmentInfo(kv.Value)
-		log.Warn("cqx", zap.Any("info", info))
 		if err != nil {
 			log.Warn("SegmentDetector failed to parse segmentInfo", zap.Error(err))
 			continue
@@ -72,13 +99,13 @@ func (sd *etcdShardSegmentDetector) watchSegments(collectionID int64, replicaID 
 	}
 
 	sd.wg.Add(1)
-	watchCh := sd.client.Watch(context.Background(), sd.path, clientv3.WithRev(resp.Header.GetRevision()+1), clientv3.WithPrefix(), clientv3.WithPrevKV())
-	go sd.watch(watchCh, collectionID, replicaID)
+	watchCh := sd.client.Watch(sd.getCtx(), sd.path, clientv3.WithRev(resp.Header.GetRevision()+1), clientv3.WithPrefix(), clientv3.WithPrevKV())
+	go sd.watch(watchCh, collectionID, replicaID, vchannelName)
 
 	return events, sd.evtCh
 }
 
-func (sd *etcdShardSegmentDetector) watch(ch clientv3.WatchChan, collectionID int64, replicaID int64) {
+func (sd *etcdShardSegmentDetector) watch(ch clientv3.WatchChan, collectionID int64, replicaID int64, vchannel string) {
 	defer sd.wg.Done()
 	log.Debug("etcdSegmentDetector start watch")
 	for {
@@ -93,37 +120,35 @@ func (sd *etcdShardSegmentDetector) watch(ch clientv3.WatchChan, collectionID in
 			}
 			if err := evt.Err(); err != nil {
 				if err == v3rpc.ErrCompacted {
-
+					sd.wg.Add(1)
+					watchCh := sd.client.Watch(sd.getCtx(), sd.path, clientv3.WithPrefix())
+					go sd.watch(watchCh, collectionID, replicaID, vchannel)
+					return
 				}
 			}
 			for _, e := range evt.Events {
 				switch e.Type {
 				case mvccpb.PUT:
-					sd.handlePutEvent(e, collectionID, replicaID)
+					sd.handlePutEvent(e, collectionID, replicaID, vchannel)
 				case mvccpb.DELETE:
-					sd.handleDelEvent(e, collectionID, replicaID)
+					sd.handleDelEvent(e, collectionID, replicaID, vchannel)
 				}
 			}
 		}
 	}
 }
 
-func (sd *etcdShardSegmentDetector) handlePutEvent(e *clientv3.Event, collectionID int64, replicaID int64) {
+func (sd *etcdShardSegmentDetector) handlePutEvent(e *clientv3.Event, collectionID int64, replicaID int64, vchannel string) {
 	info, err := sd.parseSegmentInfo(e.Kv.Value)
 	if err != nil {
 		log.Warn("Segment detector failed to parse event", zap.Any("event", e), zap.Error(err))
 		return
 	}
 
-	if info.GetCollectionID() != collectionID || inList(info.GetReplicaIds(), replicaID) {
+	if info.GetCollectionID() != collectionID || vchannel != info.GetDmChannel() || !inList(info.GetReplicaIds(), replicaID) {
 		// ignore not match events
 		return
 	}
-	/*
-		var prevInfo *querypb.SegmentInfo
-		if e.PrevKv != nil {
-			prevInfo, _ = sd.parseSegmentInfo(e.PrevKv.Value)
-		}*/
 
 	sd.evtCh <- segmentEvent{
 		eventType: segmentAdd,
@@ -133,13 +158,18 @@ func (sd *etcdShardSegmentDetector) handlePutEvent(e *clientv3.Event, collection
 	}
 }
 
-func (sd *etcdShardSegmentDetector) handleDelEvent(e *clientv3.Event, collectionID int64, replicaID int64) {
+func (sd *etcdShardSegmentDetector) handleDelEvent(e *clientv3.Event, collectionID int64, replicaID int64, vchannel string) {
 	if e.PrevKv == nil {
 		return
 	}
 	info, err := sd.parseSegmentInfo(e.PrevKv.Value)
 	if err != nil {
 		log.Warn("SegmentDetector failed to parse delete event", zap.Any("event", e), zap.Error(err))
+		return
+	}
+
+	if info.GetCollectionID() != collectionID || vchannel != info.GetDmChannel() || !inList(info.GetReplicaIds(), replicaID) {
+		// ignore not match events
 		return
 	}
 
