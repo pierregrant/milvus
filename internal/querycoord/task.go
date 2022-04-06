@@ -353,7 +353,9 @@ func (lct *loadCollectionTask) updateTaskProcess() {
 }
 
 func (lct *loadCollectionTask) preExecute(ctx context.Context) error {
-	if lct.ReplicaNumber <= 0 {
+	if lct.ReplicaNumber < 1 {
+		log.Warn("replicaNumber is less than 1 for load collection request, will set it to 1",
+			zap.Int32("replicaNumber", lct.ReplicaNumber))
 		lct.ReplicaNumber = 1
 	}
 
@@ -792,6 +794,12 @@ func (lpt *loadPartitionTask) updateTaskProcess() {
 }
 
 func (lpt *loadPartitionTask) preExecute(context.Context) error {
+	if lpt.ReplicaNumber < 1 {
+		log.Warn("replicaNumber is less than 1 for load partitions request, will set it to 1",
+			zap.Int32("replicaNumber", lpt.ReplicaNumber))
+		lpt.ReplicaNumber = 1
+	}
+
 	collectionID := lpt.CollectionID
 	lpt.setResultInfo(nil)
 	log.Debug("start do loadPartitionTask",
