@@ -18,7 +18,9 @@ package querynode
 
 import (
 	"context"
+	"io/ioutil"
 	"math/rand"
+	"net/url"
 	"os"
 	"os/signal"
 	"strconv"
@@ -30,6 +32,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/milvus-io/milvus/internal/storage"
 	"github.com/stretchr/testify/assert"
+	"go.etcd.io/etcd/server/v3/embed"
 
 	etcdkv "github.com/milvus-io/milvus/internal/kv/etcd"
 	"github.com/milvus-io/milvus/internal/mq/msgstream"
@@ -41,6 +44,8 @@ import (
 	"github.com/milvus-io/milvus/internal/util/etcd"
 	"github.com/milvus-io/milvus/internal/util/sessionutil"
 )
+
+var embedetcdServer *embed.Etcd
 
 // mock of query coordinator client
 type queryCoordMock struct {
@@ -232,9 +237,41 @@ func newMessageStreamFactory() (msgstream.Factory, error) {
 	return msFactory, err
 }
 
+func startEmbedEtcdServer() (*embed.Etcd, error) {
+	dir, err := ioutil.TempDir(os.TempDir(), "milvus_ut")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(dir)
+	config := embed.NewConfig()
+
+	config.Dir = os.TempDir()
+	config.LogLevel = "warn"
+	config.LogOutputs = []string{"default"}
+	u, err := url.Parse("http://localhost:2389")
+	if err != nil {
+		return nil, err
+	}
+	config.LCUrls = []url.URL{*u}
+	u, err = url.Parse("http://localhost:2390")
+	if err != nil {
+		return nil, err
+	}
+	config.LPUrls = []url.URL{*u}
+
+	return embed.StartEtcd(config)
+}
+
 func TestMain(m *testing.M) {
 	setup()
 	Params.CommonCfg.QueryNodeStats = Params.CommonCfg.QueryNodeStats + strconv.Itoa(rand.Int())
+	// init embed etcd
+	var err error
+	embedetcdServer, err = startEmbedEtcdServer()
+	if err != nil {
+		os.Exit(1)
+	}
+	defer embedetcdServer.Close()
 	exitCode := m.Run()
 	os.Exit(exitCode)
 }
