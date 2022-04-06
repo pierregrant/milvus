@@ -1643,6 +1643,7 @@ func TestProxy(t *testing.T) {
 			DbName:         dbName,
 			CollectionName: collectionName,
 			PartitionNames: []string{partitionName},
+			ReplicaNumber: 1,
 		})
 		assert.NoError(t, err)
 		assert.Equal(t, commonpb.ErrorCode_Success, resp.ErrorCode)
@@ -1653,6 +1654,7 @@ func TestProxy(t *testing.T) {
 			DbName:         dbName,
 			CollectionName: collectionName,
 			PartitionNames: []string{otherPartitionName},
+			ReplicaNumber: 1,
 		})
 		assert.NoError(t, err)
 		assert.NotEqual(t, commonpb.ErrorCode_Success, resp.ErrorCode)
@@ -1663,6 +1665,7 @@ func TestProxy(t *testing.T) {
 			DbName:         dbName,
 			CollectionName: otherCollectionName,
 			PartitionNames: []string{partitionName},
+			ReplicaNumber: 1,
 		})
 		assert.NoError(t, err)
 		assert.NotEqual(t, commonpb.ErrorCode_Success, resp.ErrorCode)

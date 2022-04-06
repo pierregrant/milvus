@@ -103,9 +103,10 @@ func TestQueryTask_all(t *testing.T) {
 			Timestamp: 0,
 			SourceID:  Params.ProxyCfg.ProxyID,
 		},
-		DbID:         0,
-		CollectionID: collectionID,
-		Schema:       nil,
+		DbID:          0,
+		CollectionID:  collectionID,
+		Schema:        nil,
+		ReplicaNumber: 1,
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, commonpb.ErrorCode_Success, status.ErrorCode)

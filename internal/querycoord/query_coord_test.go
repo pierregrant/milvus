@@ -176,7 +176,7 @@ func TestWatchNodeLoop(t *testing.T) {
 		}
 		collectionBlobs, err := proto.Marshal(collectionInfo)
 		assert.Nil(t, err)
-		nodeKey := fmt.Sprintf("%s/%d", collectionMetaPrefix, 100)
+		nodeKey := fmt.Sprintf("%s/%d", collectionMetaPrefix, defaultCollectionID)
 		kvs[nodeKey] = string(collectionBlobs)
 
 		err = kv.MultiSave(kvs)
@@ -581,9 +581,10 @@ func TestLoadBalanceSegmentLoop(t *testing.T) {
 			Base: &commonpb.MsgBase{
 				MsgType: commonpb.MsgType_LoadPartitions,
 			},
-			CollectionID: defaultCollectionID,
-			PartitionIDs: []UniqueID{partitionID},
-			Schema:       genDefaultCollectionSchema(false),
+			CollectionID:  defaultCollectionID,
+			PartitionIDs:  []UniqueID{partitionID},
+			Schema:        genDefaultCollectionSchema(false),
+			ReplicaNumber: 1,
 		}
 		baseTask := newBaseTask(baseCtx, querypb.TriggerCondition_GrpcRequest)
 		loadPartitionTask := &loadPartitionTask{

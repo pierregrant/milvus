@@ -71,6 +71,7 @@ type Meta interface {
 	showSegmentInfos(collectionID UniqueID, partitionIDs []UniqueID) []*querypb.SegmentInfo
 	getSegmentInfoByID(segmentID UniqueID) (*querypb.SegmentInfo, error)
 	getSegmentInfosByNode(nodeID int64) []*querypb.SegmentInfo
+	getSegmentInfosByNodeAndCollection(nodeID, collectionID int64) []*querypb.SegmentInfo
 
 	getPartitionStatesByID(collectionID UniqueID, partitionID UniqueID) (*querypb.PartitionStates, error)
 
@@ -160,6 +161,8 @@ func newMeta(ctx context.Context, kv kv.MetaKv, factory msgstream.Factory, idAll
 
 func (m *MetaReplica) reloadFromKV() error {
 	log.Debug("start reload from kv")
+
+	log.Info("recovery collections...")
 	collectionKeys, collectionValues, err := m.client.LoadWithPrefix(collectionMetaPrefix)
 	if err != nil {
 		return err
@@ -175,6 +178,9 @@ func (m *MetaReplica) reloadFromKV() error {
 			return err
 		}
 		m.collectionInfos[collectionID] = collectionInfo
+
+		log.Debug("recovery collection",
+			zap.Int64("collectionID", collectionID))
 	}
 	metrics.QueryCoordNumCollections.WithLabelValues().Set(float64(len(m.collectionInfos)))
 
@@ -214,8 +220,110 @@ func (m *MetaReplica) reloadFromKV() error {
 		m.dmChannelInfos[dmChannel] = dmChannelWatchInfo
 	}
 
+	// Compatibility for old meta format
+	// For collections that don't have replica(s), create 1 replica for them
+	// Add replica into meta storage and rewrite collection
+	dmChannels := make(map[UniqueID][]*querypb.DmChannelWatchInfo) // CollectionID -> []*DmChannelWatchInfo
+	for _, dmc := range m.dmChannelInfos {
+		dmChannels[dmc.CollectionID] = append(dmChannels[dmc.CollectionID], dmc)
+	}
+	for _, collectionInfo := range m.collectionInfos {
+		if len(collectionInfo.ReplicaIds) == 0 {
+			replica, err := m.generateReplica(collectionInfo.CollectionID, collectionInfo.PartitionIDs)
+			if err != nil {
+				return err
+			}
+
+			segments := m.showSegmentInfos(collectionInfo.CollectionID, collectionInfo.PartitionIDs)
+			// remove duplicates
+			nodes := make(map[UniqueID]struct{})
+			for _, segment := range segments {
+				for _, nodeID := range segment.NodeIds {
+					nodes[nodeID] = struct{}{}
+				}
+			}
+			for nodeID, _ := range nodes {
+				replica.NodeIds = append(replica.NodeIds, nodeID)
+			}
+
+			shardReplicas := make([]*querypb.ShardReplica, 0, len(dmChannels[collectionInfo.CollectionID]))
+			for _, dmc := range dmChannels[collectionInfo.CollectionID] {
+				shardReplicas = append(shardReplicas, &querypb.ShardReplica{
+					LeaderID: dmc.NodeIDLoaded,
+					// LeaderAddr: Will set it after the cluster is reloaded
+					DmChannelName: dmc.DmChannel,
+				})
+			}
+
+			err = m.addReplica(replica)
+			if err != nil {
+				log.Error("failed to add replica for old collection info format without replicas info",
+					zap.Int64("collectionID", replica.CollectionID),
+					zap.Error(err))
+				return err
+			}
+
+			// DO NOT insert the replica into m.replicas
+			// it will be recovered below
+		}
+	}
+
+	replicaKeys, replicaValues, err := m.client.LoadWithPrefix(ReplicaMetaPrefix)
+	if err != nil {
+		return err
+	}
+	for i := range replicaKeys {
+		replicaInfo := &querypb.ReplicaInfo{}
+		err = proto.Unmarshal([]byte(replicaValues[i]), replicaInfo)
+		if err != nil {
+			return err
+		}
+		m.replicas.Insert(replicaInfo)
+	}
+
 	//TODO::update partition states
 	log.Debug("reload from kv finished")
+
+	return nil
+}
+
+// Compatibility for old meta format, this retrieves node address from cluster.
+// The leader address is not always valid
+func reloadShardLeaderAddress(meta Meta, cluster Cluster) error {
+	collections := meta.showCollections()
+	replicas := make([]*querypb.ReplicaInfo, 0)
+
+	for _, collection := range collections {
+		collectionReplicas, err := meta.getReplicasByCollectionID(collection.CollectionID)
+		if err != nil {
+			return err
+		}
+
+		replicas = append(replicas, collectionReplicas...)
+	}
+	for _, replica := range replicas {
+		isModified := false
+		for _, shard := range replica.ShardReplicas {
+			if len(shard.LeaderAddr) == 0 {
+				nodeInfo, err := cluster.getNodeInfoByID(shard.LeaderID)
+				if err != nil {
+					log.Warn("failed to retrieve the node's address",
+						zap.Int64("nodeID", shard.LeaderID),
+						zap.Error(err))
+					continue
+				}
+				shard.LeaderAddr = nodeInfo.(*queryNode).address
+				isModified = true
+			}
+		}
+
+		if isModified {
+			err := meta.setReplicaInfo(replica)
+			if err != nil {
+				return err
+			}
+		}
+	}
 
 	return nil
 }
@@ -303,7 +411,8 @@ func (m *MetaReplica) addCollection(collectionID UniqueID, loadType querypb.Load
 			PartitionStates: partitionStates,
 			LoadType:        loadType,
 			Schema:          schema,
-			// ReplicaIDs:      replicas,
+			ReplicaIds:      make([]int64, 0),
+			ReplicaNumber:   0,
 		}
 		err := saveGlobalCollectionInfo(collectionID, newCollection, m.client)
 		if err != nil {
@@ -368,7 +477,14 @@ func (m *MetaReplica) addPartitions(collectionID UniqueID, partitionIDs []Unique
 }
 
 func (m *MetaReplica) releaseCollection(collectionID UniqueID) error {
-	err := removeCollectionMeta(collectionID, m.client)
+	collection, err := m.getCollectionInfoByID(collectionID)
+	if err != nil {
+		log.Warn("the collection has been released",
+			zap.Int64("collectionID", collectionID))
+		return nil
+	}
+
+	err = removeCollectionMeta(collectionID, collection.ReplicaIds, m.client)
 	if err != nil {
 		log.Warn("remove collectionInfo from etcd failed", zap.Int64("collectionID", collectionID), zap.Any("error", err.Error()))
 		return err
@@ -732,6 +848,16 @@ func (m *MetaReplica) getSegmentInfosByNode(nodeID int64) []*querypb.SegmentInfo
 	}
 	return res
 }
+func (m *MetaReplica) getSegmentInfosByNodeAndCollection(nodeID, collectionID int64) []*querypb.SegmentInfo {
+	var res []*querypb.SegmentInfo
+	segments := m.segmentsInfo.getSegments()
+	for _, segment := range segments {
+		if segment.GetNodeID() == nodeID && segment.GetCollectionID() == collectionID {
+			res = append(res, segment)
+		}
+	}
+	return res
+}
 
 func (m *MetaReplica) getCollectionInfoByID(collectionID UniqueID) (*querypb.CollectionInfo, error) {
 	m.collectionMu.RLock()
@@ -741,7 +867,7 @@ func (m *MetaReplica) getCollectionInfoByID(collectionID UniqueID) (*querypb.Col
 		return proto.Clone(info).(*querypb.CollectionInfo), nil
 	}
 
-	return nil, errors.New("getCollectionInfoByID: can't find collectionID in collectionInfo")
+	return nil, fmt.Errorf("getCollectionInfoByID: can't find collectionID=%v in collectionInfo", collectionID)
 }
 
 func (m *MetaReplica) getPartitionStatesByID(collectionID UniqueID, partitionID UniqueID) (*querypb.PartitionStates, error) {
@@ -1041,7 +1167,24 @@ func (m *MetaReplica) generateReplica(collectionID int64, partitionIds []int64) 
 }
 
 func (m *MetaReplica) addReplica(replica *querypb.ReplicaInfo) error {
-	err := saveReplicaInfo(replica, m.client)
+	collectionInfo, err := m.getCollectionInfoByID(replica.CollectionID)
+	if err != nil {
+		return err
+	}
+
+	collectionInfo.ReplicaIds = append(collectionInfo.ReplicaIds, replica.ReplicaID)
+	collectionInfo.ReplicaNumber++
+
+	err = saveGlobalCollectionInfo(collectionInfo.CollectionID, collectionInfo, m.client)
+	if err != nil {
+		return err
+	}
+
+	m.collectionMu.Lock()
+	m.collectionInfos[collectionInfo.CollectionID] = collectionInfo
+	m.collectionMu.Unlock()
+
+	err = saveReplicaInfo(replica, m.client)
 	if err != nil {
 		return err
 	}
@@ -1157,14 +1300,21 @@ func saveReplicaInfo(info *querypb.ReplicaInfo, kv kv.MetaKv) error {
 	return kv.Save(key, string(infoBytes))
 }
 
-func removeCollectionMeta(collectionID UniqueID, kv kv.MetaKv) error {
+func removeCollectionMeta(collectionID UniqueID, replicas []UniqueID, kv kv.MetaKv) error {
 	var prefixes []string
 	collectionInfosPrefix := fmt.Sprintf("%s/%d", collectionMetaPrefix, collectionID)
 	prefixes = append(prefixes, collectionInfosPrefix)
+
 	dmChannelInfosPrefix := fmt.Sprintf("%s/%d", dmChannelMetaPrefix, collectionID)
 	prefixes = append(prefixes, dmChannelInfosPrefix)
+
 	deltaChannelInfosPrefix := fmt.Sprintf("%s/%d", deltaChannelMetaPrefix, collectionID)
 	prefixes = append(prefixes, deltaChannelInfosPrefix)
+
+	for _, replicaID := range replicas {
+		replicaPrefix := fmt.Sprintf("%s/%d", ReplicaMetaPrefix, replicaID)
+		prefixes = append(prefixes, replicaPrefix)
+	}
 
 	return kv.MultiRemoveWithPrefix(prefixes)
 }

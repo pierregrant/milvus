@@ -3815,6 +3815,13 @@ func (node *Proxy) LoadBalance(ctx context.Context, req *milvuspb.LoadBalanceReq
 	status := &commonpb.Status{
 		ErrorCode: commonpb.ErrorCode_UnexpectedError,
 	}
+
+	collectionID, err := globalMetaCache.GetCollectionID(ctx, req.GetCollectionName())
+	if err != nil {
+		log.Error("failed to get collection id", zap.String("collection name", req.GetCollectionName()), zap.Error(err))
+		status.Reason = err.Error()
+		return status, nil
+	}
 	infoResp, err := node.queryCoord.LoadBalance(ctx, &querypb.LoadBalanceRequest{
 		Base: &commonpb.MsgBase{
 			MsgType:   commonpb.MsgType_LoadBalanceSegments,
@@ -3826,6 +3833,7 @@ func (node *Proxy) LoadBalance(ctx context.Context, req *milvuspb.LoadBalanceReq
 		DstNodeIDs:       req.DstNodeIDs,
 		BalanceReason:    querypb.TriggerCondition_GrpcRequest,
 		SealedSegmentIDs: req.SealedSegmentIDs,
+		CollectionID:     collectionID,
 	})
 	if err != nil {
 		log.Error("Failed to LoadBalance from Query Coordinator",

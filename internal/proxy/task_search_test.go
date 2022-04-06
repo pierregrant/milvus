@@ -330,9 +330,10 @@ func TestSearchTask_PreExecute(t *testing.T) {
 			Timestamp: 0,
 			SourceID:  0,
 		},
-		DbID:         0,
-		CollectionID: collectionID,
-		Schema:       nil,
+		DbID:          0,
+		CollectionID:  collectionID,
+		Schema:        nil,
+		ReplicaNumber: 1,
 	})
 
 	// no anns field
@@ -753,9 +754,10 @@ func TestSearchTaskWithInvalidRoundDecimal(t *testing.T) {
 			Timestamp: 0,
 			SourceID:  Params.ProxyCfg.ProxyID,
 		},
-		DbID:         0,
-		CollectionID: collectionID,
-		Schema:       nil,
+		DbID:          0,
+		CollectionID:  collectionID,
+		Schema:        nil,
+		ReplicaNumber: 1,
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, commonpb.ErrorCode_Success, status.ErrorCode)
@@ -1005,9 +1007,10 @@ func TestSearchTask_all(t *testing.T) {
 			Timestamp: 0,
 			SourceID:  Params.ProxyCfg.ProxyID,
 		},
-		DbID:         0,
-		CollectionID: collectionID,
-		Schema:       nil,
+		DbID:          0,
+		CollectionID:  collectionID,
+		Schema:        nil,
+		ReplicaNumber: 1,
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, commonpb.ErrorCode_Success, status.ErrorCode)
@@ -1253,9 +1256,10 @@ func TestSearchTask_7803_reduce(t *testing.T) {
 			Timestamp: 0,
 			SourceID:  Params.ProxyCfg.ProxyID,
 		},
-		DbID:         0,
-		CollectionID: collectionID,
-		Schema:       nil,
+		DbID:          0,
+		CollectionID:  collectionID,
+		Schema:        nil,
+		ReplicaNumber: 1,
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, commonpb.ErrorCode_Success, status.ErrorCode)
