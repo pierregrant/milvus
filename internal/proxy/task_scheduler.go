@@ -23,16 +23,10 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/milvus-io/milvus/internal/util/typeutil"
-
-	"github.com/milvus-io/milvus/internal/util/funcutil"
-
 	"go.uber.org/zap"
 
 	"github.com/milvus-io/milvus/internal/log"
 	"github.com/milvus-io/milvus/internal/mq/msgstream"
-	"github.com/milvus-io/milvus/internal/proto/commonpb"
-	"github.com/milvus-io/milvus/internal/proto/internalpb"
 	"github.com/milvus-io/milvus/internal/util/trace"
 	"github.com/opentracing/opentracing-go"
 	oplog "github.com/opentracing/opentracing-go/log"
@@ -385,17 +379,9 @@ type taskScheduler struct {
 	cancel context.CancelFunc
 
 	msFactory msgstream.Factory
-
-	searchResultCh chan *internalpb.SearchResults
 }
 
 type schedOpt func(*taskScheduler)
-
-func schedOptWithSearchResultCh(ch chan *internalpb.SearchResults) schedOpt {
-	return func(sched *taskScheduler) {
-		sched.searchResultCh = ch
-	}
-}
 
 func newTaskScheduler(ctx context.Context,
 	idAllocatorIns idAllocatorInterface,
@@ -544,165 +530,6 @@ func (sched *taskScheduler) queryLoop() {
 	}
 }
 
-type resultBufHeader struct {
-	msgID                       UniqueID
-	usedVChans                  map[interface{}]struct{} // set of vChan
-	receivedVChansSet           map[interface{}]struct{} // set of vChan
-	receivedSealedSegmentIDsSet map[interface{}]struct{} // set of UniqueID
-	receivedGlobalSegmentIDsSet map[interface{}]struct{} // set of UniqueID
-	haveError                   bool
-}
-
-type searchResultBuf struct {
-	resultBufHeader
-	resultBuf []*internalpb.SearchResults
-}
-
-func newSearchResultBuf(msgID UniqueID) *searchResultBuf {
-	return &searchResultBuf{
-		resultBufHeader: resultBufHeader{
-			usedVChans:                  make(map[interface{}]struct{}),
-			receivedVChansSet:           make(map[interface{}]struct{}),
-			receivedSealedSegmentIDsSet: make(map[interface{}]struct{}),
-			receivedGlobalSegmentIDsSet: make(map[interface{}]struct{}),
-			haveError:                   false,
-			msgID:                       msgID,
-		},
-		resultBuf: make([]*internalpb.SearchResults, 0),
-	}
-}
-
-func (sr *resultBufHeader) readyToReduce() bool {
-	if sr.haveError {
-		log.Debug("Proxy searchResultBuf readyToReduce", zap.Any("haveError", true))
-		return true
-	}
-
-	log.Debug("check if result buf is ready to reduce",
-		zap.String("role", typeutil.ProxyRole),
-		zap.Int64("MsgID", sr.msgID),
-		zap.Any("receivedVChansSet", funcutil.SetToSlice(sr.receivedVChansSet)),
-		zap.Any("usedVChans", funcutil.SetToSlice(sr.usedVChans)),
-		zap.Any("receivedSealedSegmentIDsSet", funcutil.SetToSlice(sr.receivedSealedSegmentIDsSet)),
-		zap.Any("receivedGlobalSegmentIDsSet", funcutil.SetToSlice(sr.receivedGlobalSegmentIDsSet)))
-
-	ret1 := funcutil.SetContain(sr.receivedVChansSet, sr.usedVChans)
-	if !ret1 {
-		return false
-	}
-
-	return funcutil.SetContain(sr.receivedSealedSegmentIDsSet, sr.receivedGlobalSegmentIDsSet)
-}
-
-func (sr *resultBufHeader) addPartialResult(vchans []vChan, searchSegIDs, globalSegIDs []UniqueID) {
-
-	for _, vchan := range vchans {
-		sr.receivedVChansSet[vchan] = struct{}{}
-	}
-
-	for _, sealedSegment := range searchSegIDs {
-		sr.receivedSealedSegmentIDsSet[sealedSegment] = struct{}{}
-	}
-
-	for _, globalSegment := range globalSegIDs {
-		sr.receivedGlobalSegmentIDsSet[globalSegment] = struct{}{}
-	}
-}
-
-func (sr *searchResultBuf) addPartialResult(result *internalpb.SearchResults) {
-	sr.resultBuf = append(sr.resultBuf, result)
-	if result.Status.ErrorCode != commonpb.ErrorCode_Success {
-		sr.haveError = true
-		return
-	}
-	sr.resultBufHeader.addPartialResult(result.ChannelIDsSearched, result.SealedSegmentIDsSearched,
-		result.GlobalSealedSegmentIDs)
-}
-
-func (sched *taskScheduler) collectionResultLoopV2() {
-	defer sched.wg.Done()
-
-	searchResultBufs := make(map[UniqueID]*searchResultBuf)
-	searchResultBufFlags := newIDCache(Params.ProxyCfg.BufFlagExpireTime, Params.ProxyCfg.BufFlagCleanupInterval) // if value is true, we can ignore searchResult
-
-	processSearchResult := func(results *internalpb.SearchResults) error {
-		reqID := results.Base.MsgID
-
-		ignoreThisResult, ok := searchResultBufFlags.Get(reqID)
-		if !ok {
-			searchResultBufFlags.Set(reqID, false)
-			ignoreThisResult = false
-		}
-		if ignoreThisResult {
-			log.Debug("got a search result, but we should ignore", zap.String("role", typeutil.ProxyRole), zap.Int64("ReqID", reqID))
-			return nil
-		}
-
-		log.Debug("got a search result", zap.String("role", typeutil.ProxyRole), zap.Int64("ReqID", reqID))
-
-		t := sched.getTaskByReqID(reqID)
-
-		if t == nil {
-			log.Debug("got a search result, but not in task scheduler", zap.String("role", typeutil.ProxyRole), zap.Int64("ReqID", reqID))
-			delete(searchResultBufs, reqID)
-			searchResultBufFlags.Set(reqID, true)
-		}
-
-		st, ok := t.(*searchTask)
-		if !ok {
-			log.Debug("got a search result, but the related task is not of search task", zap.String("role", typeutil.ProxyRole), zap.Int64("ReqID", reqID))
-			delete(searchResultBufs, reqID)
-			searchResultBufFlags.Set(reqID, true)
-			return nil
-		}
-
-		resultBuf, ok := searchResultBufs[reqID]
-		if !ok {
-			log.Debug("first receive search result of this task", zap.String("role", typeutil.ProxyRole), zap.Int64("reqID", reqID))
-			resultBuf = newSearchResultBuf(reqID)
-			vchans, err := st.getVChannels()
-			if err != nil {
-				delete(searchResultBufs, reqID)
-				log.Warn("failed to get virtual channels", zap.String("role", typeutil.ProxyRole), zap.Error(err), zap.Int64("reqID", reqID))
-				return err
-			}
-			for _, vchan := range vchans {
-				resultBuf.usedVChans[vchan] = struct{}{}
-			}
-			searchResultBufs[reqID] = resultBuf
-		}
-		resultBuf.addPartialResult(results)
-
-		colName := t.(*searchTask).query.CollectionName
-		log.Debug("process search result", zap.String("role", typeutil.ProxyRole), zap.String("collection", colName), zap.Int64("reqID", reqID), zap.Int("answer cnt", len(searchResultBufs[reqID].resultBuf)))
-
-		if resultBuf.readyToReduce() {
-			log.Debug("process search result, ready to reduce", zap.String("role", typeutil.ProxyRole), zap.Int64("reqID", reqID))
-			searchResultBufFlags.Set(reqID, true)
-			st.resultBuf <- resultBuf.resultBuf
-			delete(searchResultBufs, reqID)
-		}
-
-		return nil
-	}
-
-	for {
-		select {
-		case <-sched.ctx.Done():
-			log.Info("task scheduler's result loop of Proxy exit", zap.String("reason", "context done"))
-			return
-		case sr, ok := <-sched.searchResultCh:
-			if !ok {
-				log.Info("task scheduler's result loop of Proxy exit", zap.String("reason", "search result channel closed"))
-				return
-			}
-			if err := processSearchResult(sr); err != nil {
-				log.Warn("failed to process search result", zap.Error(err))
-			}
-		}
-	}
-}
-
 func (sched *taskScheduler) Start() error {
 	sched.wg.Add(1)
 	go sched.definitionLoop()
@@ -712,10 +539,6 @@ func (sched *taskScheduler) Start() error {
 
 	sched.wg.Add(1)
 	go sched.queryLoop()
-
-	sched.wg.Add(1)
-	// go sched.collectResultLoop()
-	go sched.collectionResultLoopV2()
 
 	return nil
 }
