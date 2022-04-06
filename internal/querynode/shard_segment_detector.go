@@ -93,7 +93,7 @@ func (sd *etcdShardSegmentDetector) watchSegments(collectionID int64, replicaID 
 				eventType: segmentAdd,
 				segmentID: info.GetSegmentID(),
 				nodeID:    info.GetNodeID(),
-				state:     segmentStateLoading,
+				state:     segmentStateLoaded,
 			})
 		}
 	}
@@ -154,7 +154,7 @@ func (sd *etcdShardSegmentDetector) handlePutEvent(e *clientv3.Event, collection
 		eventType: segmentAdd,
 		segmentID: info.GetSegmentID(),
 		nodeID:    info.GetNodeID(),
-		state:     segmentStateLoading,
+		state:     segmentStateLoaded,
 	}
 }
 

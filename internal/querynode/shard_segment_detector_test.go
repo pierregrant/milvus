@@ -16,11 +16,8 @@ import (
 )
 
 func TestEtcdShardSegmentDetector_watch(t *testing.T) {
-	etcdServer, err := startEmbedEtcdServer()
-	require.NoError(t, err)
-	defer etcdServer.Close()
 
-	client := v3client.New(etcdServer.Server)
+	client := v3client.New(embedetcdServer.Server)
 	defer client.Close()
 
 	type testCase struct {
@@ -60,7 +57,7 @@ func TestEtcdShardSegmentDetector_watch(t *testing.T) {
 					eventType: segmentAdd,
 					segmentID: 1,
 					nodeID:    1,
-					state:     segmentStateLoading,
+					state:     segmentStateLoaded,
 				},
 			},
 		},
@@ -104,7 +101,7 @@ func TestEtcdShardSegmentDetector_watch(t *testing.T) {
 					eventType: segmentAdd,
 					segmentID: 1,
 					nodeID:    1,
-					state:     segmentStateLoading,
+					state:     segmentStateLoaded,
 				},
 			},
 		},
@@ -130,7 +127,7 @@ func TestEtcdShardSegmentDetector_watch(t *testing.T) {
 					eventType: segmentAdd,
 					segmentID: 1,
 					nodeID:    1,
-					state:     segmentStateLoading,
+					state:     segmentStateLoaded,
 				},
 			},
 		},
@@ -163,7 +160,7 @@ func TestEtcdShardSegmentDetector_watch(t *testing.T) {
 					eventType: segmentAdd,
 					segmentID: 1,
 					nodeID:    1,
-					state:     segmentStateLoading,
+					state:     segmentStateLoaded,
 				},
 			},
 		},
@@ -189,7 +186,7 @@ func TestEtcdShardSegmentDetector_watch(t *testing.T) {
 					eventType: segmentAdd,
 					segmentID: 1,
 					nodeID:    1,
-					state:     segmentStateLoading,
+					state:     segmentStateLoaded,
 				},
 			},
 			delRecords: []string{
@@ -230,7 +227,7 @@ func TestEtcdShardSegmentDetector_watch(t *testing.T) {
 					eventType: segmentAdd,
 					segmentID: 1,
 					nodeID:    1,
-					state:     segmentStateLoading,
+					state:     segmentStateLoaded,
 				},
 			},
 			delRecords: []string{
@@ -261,7 +258,7 @@ func TestEtcdShardSegmentDetector_watch(t *testing.T) {
 			}
 			// put garbage data
 			for key, value := range tc.oldGarbage {
-				_, err = client.Put(ctx, path.Join(rootPath, key), value)
+				_, err := client.Put(ctx, path.Join(rootPath, key), value)
 				require.NoError(t, err)
 			}
 
@@ -282,7 +279,7 @@ func TestEtcdShardSegmentDetector_watch(t *testing.T) {
 					require.NoError(t, err)
 				}
 				for key, value := range tc.newGarbage {
-					_, err = client.Put(ctx, path.Join(rootPath, key), value)
+					_, err := client.Put(ctx, path.Join(rootPath, key), value)
 					require.NoError(t, err)
 				}
 				// need a way to detect event processed
