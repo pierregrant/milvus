@@ -8,10 +8,9 @@ import (
 )
 
 func (node *Proxy) SendSearchResult(ctx context.Context, req *internalpb.SearchResults) (*commonpb.Status, error) {
-	node.searchResultCh <- req
 	return &commonpb.Status{
-		ErrorCode: commonpb.ErrorCode_Success,
-		Reason:    "",
+		ErrorCode: commonpb.ErrorCode_UnexpectedError,
+		Reason:    "Not implemented",
 	}, nil
 }
 

@@ -2388,7 +2388,7 @@ func (node *Proxy) Search(ctx context.Context, request *milvuspb.SearchRequest) 
 	defer sp.Finish()
 	traceID, _, _ := trace.InfoFromSpan(sp)
 
-	qt := &searchTask{
+	qt := &searchTaskV2{
 		ctx:       ctx,
 		Condition: NewTaskCondition(ctx),
 		SearchRequest: &internalpb.SearchRequest{
@@ -2398,11 +2398,10 @@ func (node *Proxy) Search(ctx context.Context, request *milvuspb.SearchRequest) 
 			},
 			ResultChannelID: strconv.FormatInt(Params.ProxyCfg.ProxyID, 10),
 		},
-		resultBuf: make(chan []*internalpb.SearchResults, 1),
-		query:     request,
-		chMgr:     node.chMgr,
-		qc:        node.queryCoord,
-		tr:        timerecord.NewTimeRecorder("search"),
+		request:            request,
+		qc:                 node.queryCoord,
+		tr:                 timerecord.NewTimeRecorder("search"),
+		getQueryNodePolicy: defaultGetQueryNodePolicy,
 	}
 
 	travelTs := request.TravelTimestamp
