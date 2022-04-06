@@ -1477,7 +1477,7 @@ func TestGetReplicas(t *testing.T) {
 	assert.Equal(t, commonpb.ErrorCode_Success, status.ErrorCode)
 	waitLoadCollectionDone(ctx, queryCoord, defaultCollectionID)
 
-	getReplicasReq := &querypb.GetReplicasRequest{
+	getReplicasReq := &milvuspb.GetReplicasRequest{
 		Base:         &commonpb.MsgBase{},
 		CollectionID: loadCollectionReq.CollectionID,
 	}

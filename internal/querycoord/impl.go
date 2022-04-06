@@ -1019,7 +1019,7 @@ func (qc *QueryCoord) GetMetrics(ctx context.Context, req *milvuspb.GetMetricsRe
 }
 
 // GetReplicas gets replicas of a certain collection
-func (qc *QueryCoord) GetReplicas(ctx context.Context, req *querypb.GetReplicasRequest) (*querypb.GetReplicasResponse, error) {
+func (qc *QueryCoord) GetReplicas(ctx context.Context, req *milvuspb.GetReplicasRequest) (*milvuspb.GetReplicasResponse, error) {
 	log.Debug("GetReplicas received",
 		zap.String("role", typeutil.QueryCoordRole),
 		zap.Int64("collectionID", req.CollectionID),
@@ -1034,7 +1034,7 @@ func (qc *QueryCoord) GetReplicas(ctx context.Context, req *querypb.GetReplicasR
 		err := errors.New("QueryCoord is not healthy")
 		status.Reason = err.Error()
 		log.Error("GetReplicasResponse failed", zap.String("role", typeutil.QueryCoordRole), zap.Int64("msgID", req.Base.MsgID), zap.Error(err))
-		return &querypb.GetReplicasResponse{
+		return &milvuspb.GetReplicasResponse{
 			Status: status,
 		}, nil
 	}
@@ -1049,7 +1049,7 @@ func (qc *QueryCoord) GetReplicas(ctx context.Context, req *querypb.GetReplicasR
 			zap.Int64("msgID", req.Base.MsgID),
 			zap.Error(err))
 
-		return &querypb.GetReplicasResponse{
+		return &milvuspb.GetReplicasResponse{
 			Status: status,
 		}, nil
 	}
@@ -1072,14 +1072,14 @@ func (qc *QueryCoord) GetReplicas(ctx context.Context, req *querypb.GetReplicasR
 
 		for _, replica := range replicas {
 			for _, shard := range replica.ShardReplicas {
-				for nodeID, _ := range shardNodes[shard.DmChannelName] {
+				for nodeID := range shardNodes[shard.DmChannelName] {
 					shard.NodeIds = append(shard.NodeIds, nodeID)
 				}
 			}
 		}
 	}
 
-	return &querypb.GetReplicasResponse{
+	return &milvuspb.GetReplicasResponse{
 		Status:   status,
 		Replicas: replicas,
 	}, nil

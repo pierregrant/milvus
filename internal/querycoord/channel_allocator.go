@@ -33,9 +33,9 @@ func defaultChannelAllocatePolicy() ChannelAllocatePolicy {
 }
 
 // ChannelAllocatePolicy helper function definition to allocate dmChannel to queryNode
-type ChannelAllocatePolicy func(ctx context.Context, reqs []*querypb.WatchDmChannelsRequest, cluster Cluster, metaCache Meta, wait bool, excludeNodeIDs []int64, includeNodeIDs []int64,replicaID int64) error
+type ChannelAllocatePolicy func(ctx context.Context, reqs []*querypb.WatchDmChannelsRequest, cluster Cluster, metaCache Meta, wait bool, excludeNodeIDs []int64, includeNodeIDs []int64, replicaID int64) error
 
-func shuffleChannelsToQueryNode(ctx context.Context, reqs []*querypb.WatchDmChannelsRequest, cluster Cluster, metaCache Meta, wait bool, excludeNodeIDs []int64, includeNodeIDs []int64,replicaID int64) error {
+func shuffleChannelsToQueryNode(ctx context.Context, reqs []*querypb.WatchDmChannelsRequest, cluster Cluster, metaCache Meta, wait bool, excludeNodeIDs []int64, includeNodeIDs []int64, replicaID int64) error {
 	if len(reqs) == 0 {
 		return nil
 	}
@@ -67,7 +67,7 @@ func shuffleChannelsToQueryNode(ctx context.Context, reqs []*querypb.WatchDmChan
 			if len(includeNodeIDs) > 0 && !nodeIncluded(nodeID, includeNodeIDs) {
 				continue
 			}
-			
+
 			// nodeID in excludeNodeIDs
 			if nodeIncluded(nodeID, excludeNodeIDs) {
 				continue
