@@ -51,43 +51,8 @@ func genSimpleQueryShard(ctx context.Context) (*queryShard, error) {
 		return nil, err
 	}
 
-	nodeEvents := []nodeEvent{
-		{
-			nodeID:   1,
-			nodeAddr: "addr_1",
-		},
-		{
-			nodeID:   2,
-			nodeAddr: "addr_2",
-		},
-	}
-
-	segmentEvents := []segmentEvent{
-		{
-			segmentID: 1,
-			nodeID:    1,
-			state:     segmentStateLoaded,
-		},
-		{
-			segmentID: 2,
-			nodeID:    2,
-			state:     segmentStateLoaded,
-		},
-		{
-			segmentID: 3,
-			nodeID:    2,
-			state:     segmentStateLoaded,
-		},
-	}
-
-	shardCluster := NewShardCluster(collectionID, replicaID, vchannelName,
-		&mockNodeDetector{
-			initNodes: nodeEvents,
-		}, &mockSegmentDetector{
-			initSegments: segmentEvents,
-		}, buildMockQueryNode)
-
-	qs := newQueryShard(ctx, collectionID, vchannelName, replicaID, shardCluster,
+	// TODO: need mock shardClusterService to test leader search/query
+	qs := newQueryShard(ctx, collectionID, vchannelName, replicaID, nil,
 		historical, streaming, localCM, remoteCM, false)
 	return qs, nil
 }
@@ -95,8 +60,23 @@ func genSimpleQueryShard(ctx context.Context) (*queryShard, error) {
 func TestQueryShard_Search(t *testing.T) {
 	qs, err := genSimpleQueryShard(context.Background())
 	assert.NoError(t, err)
-	_, err = qs.search(context.Background(), &querypb.SearchRequest{})
-	assert.Error(t, err)
+
+	req, err := genSimpleSearchRequest(IndexFaissIDMap)
+	assert.NoError(t, err)
+
+	t.Run("search follower", func(t *testing.T) {
+		request := &querypb.SearchRequest{
+			Req:        req,
+			DmlChannel: "",
+			SegmentIDs: []int64{defaultSegmentID},
+		}
+
+		_, err = qs.search(context.Background(), request)
+		assert.NoError(t, err)
+	})
+
+	t.Run("search leader", func(t *testing.T) {
+	})
 }
 
 func TestQueryShard_Query(t *testing.T) {
@@ -119,15 +99,15 @@ func TestQueryShard_Query(t *testing.T) {
 	})
 
 	t.Run("query leader", func(t *testing.T) {
-		request := &querypb.QueryRequest{
-			Req:        req,
-			DmlChannel: defaultDMLChannel,
-			SegmentIDs: []int64{},
-		}
-
-		resp, err := qs.query(context.Background(), request)
-		assert.NoError(t, err)
-		assert.ElementsMatch(t, resp.Ids.GetIntId().Data, []int64{}) // use mock node builder for now
+		// request := &querypb.QueryRequest{
+		// 	Req:        req,
+		// 	DmlChannel: defaultDMLChannel,
+		// 	SegmentIDs: []int64{},
+		// }
+		//
+		// resp, err := qs.query(context.Background(), request)
+		// assert.NoError(t, err)
+		// assert.ElementsMatch(t, resp.Ids.GetIntId().Data, []int64{}) // use mock node builder for now
 		// assert.ElementsMatch(t, resp.Ids.GetIntId().Data, []int64{1, 2, 3}) // expected behavior in future
 	})
 }

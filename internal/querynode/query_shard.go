@@ -20,7 +20,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 
+	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 
 	"github.com/milvus-io/milvus/internal/log"
@@ -30,6 +32,7 @@ import (
 	"github.com/milvus-io/milvus/internal/proto/querypb"
 	"github.com/milvus-io/milvus/internal/proto/schemapb"
 	"github.com/milvus-io/milvus/internal/storage"
+	"github.com/milvus-io/milvus/internal/util/distance"
 	"github.com/milvus-io/milvus/internal/util/typeutil"
 )
 
@@ -83,7 +86,300 @@ func newQueryShard(
 }
 
 func (q *queryShard) search(ctx context.Context, req *querypb.SearchRequest) (*internalpb.SearchResults, error) {
-	return nil, errors.New("not implemented")
+	collectionID := req.Req.CollectionID
+	segmentIDs := req.SegmentIDs
+	timestamp := req.Req.TravelTimestamp
+	// TODO: hold request until guarantee timestamp >= service timestamp
+
+	q.historical.replica.queryRLock()
+	q.streaming.replica.queryRLock()
+	defer q.historical.replica.queryRUnlock()
+	defer q.streaming.replica.queryRLock()
+
+	// deserialize query plan
+	collection, err := q.historical.replica.getCollectionByID(collectionID)
+	if err != nil {
+		return nil, err
+	}
+
+	var plan *SearchPlan
+	if req.Req.GetDslType() == commonpb.DslType_BoolExprV1 {
+		expr := req.Req.SerializedExprPlan
+		plan, err = createSearchPlanByExpr(collection, expr)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		dsl := req.Req.Dsl
+		plan, err = createSearchPlan(collection, dsl)
+		if err != nil {
+			return nil, err
+		}
+	}
+	defer plan.delete()
+
+	schemaHelper, err := typeutil.CreateSchemaHelper(collection.schema)
+	if err != nil {
+		return nil, err
+	}
+
+	// validate top-k
+	topK := plan.getTopK()
+	if topK <= 0 || topK >= 16385 {
+		return nil, fmt.Errorf("limit should be in range [1, 16385], but got %d", topK)
+	}
+
+	// parse plan to search request
+	searchReq, err := parseSearchRequest(plan, req.Req.PlaceholderGroup)
+	if err != nil {
+		return nil, err
+	}
+	defer searchReq.delete()
+	queryNum := searchReq.getNumOfQuery()
+	searchRequests := []*searchRequest{searchReq}
+
+	if len(segmentIDs) == 0 {
+		cluster, ok := q.clusterService.getShardCluster(req.GetDmlChannel())
+		if !ok {
+			return nil, fmt.Errorf("channel %s leader is not here", req.GetDmlChannel())
+		}
+
+		// shard leader dispatches request to its shard cluster
+		results, err := cluster.Search(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+		// shard leader queries its own streaming data
+		streamingResults, _, _, err := q.streaming.search(searchRequests, collectionID, req.Req.PartitionIDs, req.DmlChannel, plan, timestamp)
+		if err != nil {
+			return nil, err
+		}
+		defer deleteSearchResults(streamingResults)
+
+		// reduce search results
+		numSegment := int64(len(streamingResults))
+		err = reduceSearchResultsAndFillData(plan, streamingResults, numSegment)
+		marshaledHits, err := reorganizeSearchResults(streamingResults, numSegment)
+		if err != nil {
+			return nil, err
+		}
+		defer deleteMarshaledHits(marshaledHits)
+
+		// transform (hard to understand)
+		hitsBlob, err := marshaledHits.getHitsBlob()
+		if err != nil {
+			return nil, err
+		}
+
+		hitBlobSizePeerQuery, err := marshaledHits.hitBlobSizeInGroup(int64(0))
+		if err != nil {
+			return nil, err
+		}
+
+		var offset int64 = 0
+		hits := make([][]byte, len(hitBlobSizePeerQuery))
+		for i, length := range hitBlobSizePeerQuery {
+			hits[i] = hitsBlob[offset : offset+length]
+			offset += length
+		}
+
+		transformed, err := translateHits(schemaHelper, req.Req.OutputFieldsId, hits)
+		if err != nil {
+			return nil, err
+		}
+		byteBlobs, err := proto.Marshal(transformed)
+		if err != nil {
+			return nil, err
+		}
+
+		// complete results with merged streaming result
+		results = append(results, &internalpb.SearchResults{
+			Status:         &commonpb.Status{ErrorCode: commonpb.ErrorCode_Success},
+			MetricType:     plan.getMetricType(),
+			NumQueries:     queryNum,
+			TopK:           topK,
+			SlicedBlob:     byteBlobs,
+			SlicedOffset:   1,
+			SlicedNumCount: 1,
+		})
+
+		// reduce shard search results: unmarshal -> reduce -> marshal
+		searchResultData, err := decodeSearchResults(results)
+		if err != nil {
+			return nil, err
+		}
+		reducedResultData, err := reduceSearchResultData(searchResultData, queryNum, plan.getTopK(), plan.getMetricType())
+		if err != nil {
+			return nil, err
+		}
+		return encodeSearchResultData(reducedResultData)
+	}
+
+	// search each segments by segment IDs in request
+	searchResults, _, err := q.historical.searchSegments(segmentIDs, searchRequests, plan, timestamp)
+	if err != nil {
+		return nil, err
+	}
+	defer deleteSearchResults(searchResults)
+
+	// reduce search results
+	numSegment := int64(len(searchResults))
+	err = reduceSearchResultsAndFillData(plan, searchResults, numSegment)
+	marshaledHits, err := reorganizeSearchResults(searchResults, numSegment)
+	if err != nil {
+		return nil, err
+	}
+	defer deleteMarshaledHits(marshaledHits)
+
+	// transform (hard to understand)
+	hitsBlob, err := marshaledHits.getHitsBlob()
+	if err != nil {
+		return nil, err
+	}
+
+	hitBlobSizePeerQuery, err := marshaledHits.hitBlobSizeInGroup(int64(0))
+	if err != nil {
+		return nil, err
+	}
+
+	var offset int64 = 0
+	hits := make([][]byte, len(hitBlobSizePeerQuery))
+	for i, length := range hitBlobSizePeerQuery {
+		hits[i] = hitsBlob[offset : offset+length]
+		offset += length
+	}
+
+	transformed, err := translateHits(schemaHelper, req.Req.OutputFieldsId, hits)
+	if err != nil {
+		return nil, err
+	}
+	byteBlobs, err := proto.Marshal(transformed)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := &internalpb.SearchResults{
+		Status:         &commonpb.Status{ErrorCode: commonpb.ErrorCode_Success},
+		MetricType:     plan.getMetricType(),
+		NumQueries:     queryNum,
+		TopK:           topK,
+		SlicedBlob:     byteBlobs,
+		SlicedOffset:   1,
+		SlicedNumCount: 1,
+	}
+	return resp, nil
+}
+
+func reduceSearchResultData(searchResultData []*schemapb.SearchResultData, nq int64, topk int64, metricType string) (*schemapb.SearchResultData, error) {
+	ret := &schemapb.SearchResultData{
+		NumQueries: nq,
+		TopK:       topk,
+		FieldsData: make([]*schemapb.FieldData, len(searchResultData[0].FieldsData)),
+		Scores:     make([]float32, 0),
+		Ids: &schemapb.IDs{
+			IdField: &schemapb.IDs_IntId{
+				IntId: &schemapb.LongArray{
+					Data: make([]int64, 0),
+				},
+			},
+		},
+		Topks: make([]int64, 0),
+	}
+
+	var skipDupCnt int64
+	var realTopK int64 = -1
+	for i := int64(0); i < nq; i++ {
+		offsets := make([]int64, len(searchResultData))
+
+		var idSet = make(map[int64]struct{})
+		var j int64
+		for j = 0; j < topk; {
+			sel := selectSearchResultData(searchResultData, offsets, topk, i)
+			if sel == -1 {
+				break
+			}
+			idx := i*topk + offsets[sel]
+
+			id := searchResultData[sel].Ids.GetIntId().Data[idx]
+			score := searchResultData[sel].Scores[idx]
+			// ignore invalid search result
+			if id == -1 {
+				continue
+			}
+
+			// remove duplicates
+			if _, ok := idSet[id]; !ok {
+				typeutil.AppendFieldData(ret.FieldsData, searchResultData[sel].FieldsData, idx)
+				ret.Ids.GetIntId().Data = append(ret.Ids.GetIntId().Data, id)
+				ret.Scores = append(ret.Scores, score)
+				idSet[id] = struct{}{}
+				j++
+			} else {
+				// skip entity with same id
+				skipDupCnt++
+			}
+			offsets[sel]++
+		}
+		if realTopK != -1 && realTopK != j {
+			log.Warn("Proxy Reduce Search Result", zap.Error(errors.New("the length (topk) between all result of query is different")))
+			// return nil, errors.New("the length (topk) between all result of query is different")
+		}
+		realTopK = j
+		ret.Topks = append(ret.Topks, realTopK)
+	}
+	log.Debug("skip duplicated search result", zap.Int64("count", skipDupCnt))
+	ret.TopK = realTopK
+
+	if !distance.PositivelyRelated(metricType) {
+		for k := range ret.Scores {
+			ret.Scores[k] *= -1
+		}
+	}
+
+	return ret, nil
+}
+
+func selectSearchResultData(dataArray []*schemapb.SearchResultData, offsets []int64, topk int64, qi int64) int {
+	sel := -1
+	maxDistance := -1 * float32(math.MaxFloat32)
+	for i, offset := range offsets { // query num, the number of ways to merge
+		if offset >= topk {
+			continue
+		}
+		idx := qi*topk + offset
+		id := dataArray[i].Ids.GetIntId().Data[idx]
+		if id != -1 {
+			distance := dataArray[i].Scores[idx]
+			if distance > maxDistance {
+				sel = i
+				maxDistance = distance
+			}
+		}
+	}
+	return sel
+}
+
+func decodeSearchResults(searchResults []*internalpb.SearchResults) ([]*schemapb.SearchResultData, error) {
+	results := make([]*schemapb.SearchResultData, 0)
+	for _, partialSearchResult := range searchResults {
+		if partialSearchResult.SlicedBlob == nil {
+			continue
+		}
+
+		var partialResultData schemapb.SearchResultData
+		err := proto.Unmarshal(partialSearchResult.SlicedBlob, &partialResultData)
+		if err != nil {
+			return nil, err
+		}
+
+		results = append(results, &partialResultData)
+	}
+	return results, nil
+}
+
+func encodeSearchResultData(searchResultData *schemapb.SearchResultData) (searchResults *internalpb.SearchResults, err error) {
+	searchResults.SlicedBlob, err = proto.Marshal(searchResultData)
+	return
 }
 
 func (q *queryShard) query(ctx context.Context, req *querypb.QueryRequest) (*internalpb.RetrieveResults, error) {

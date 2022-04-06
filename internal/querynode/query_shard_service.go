@@ -72,7 +72,7 @@ func newQueryShardService(ctx context.Context, historical *historical, streaming
 	return qss
 }
 
-func (q *queryShardService) addQueryShard(collectionID UniqueID, channel Channel, replicaID int64, cluster *ShardCluster) error {
+func (q *queryShardService) addQueryShard(collectionID UniqueID, channel Channel, replicaID int64) error {
 	q.queryShardsMu.Lock()
 	defer q.queryShardsMu.Unlock()
 	if _, ok := q.queryShards[channel]; ok {
