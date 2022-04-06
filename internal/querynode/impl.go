@@ -18,6 +18,7 @@ package querynode
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"go.uber.org/zap"
@@ -567,6 +568,10 @@ func (node *QueryNode) Search(ctx context.Context, req *queryPb.SearchRequest) (
 
 	log.Debug("Received QueryRequest", zap.String("vchannel", req.GetDmlChannel()), zap.Int64s("segmentIDs", req.GetSegmentIDs()))
 
+	if node.queryShardService == nil {
+		return nil, errors.New("queryShardService is nil")
+	}
+
 	qs, err := node.queryShardService.getQueryShard(req.GetDmlChannel())
 	if err != nil {
 		return &internalpb.SearchResults{
@@ -603,6 +608,10 @@ func (node *QueryNode) Query(ctx context.Context, req *queryPb.QueryRequest) (*i
 		}, nil
 	}
 	log.Debug("Received QueryRequest", zap.String("vchannel", req.GetDmlChannel()), zap.Int64s("segmentIDs", req.GetSegmentIDs()))
+
+	if node.queryShardService == nil {
+		return nil, errors.New("queryShardService is nil")
+	}
 
 	qs, err := node.queryShardService.getQueryShard(req.GetDmlChannel())
 	if err != nil {
