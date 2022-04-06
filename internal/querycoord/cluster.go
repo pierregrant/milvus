@@ -717,7 +717,7 @@ func (c *queryNodeCluster) assignNodesToReplicas(ctx context.Context, replicas [
 		return err
 	}
 	if len(nodeInfos) < len(replicas) {
-		return fmt.Errorf("no enough nodes to create replicas, node_num=%d replica_num=%d", len(nodeIds), len(replicas))
+		return fmt.Errorf("no enough nodes to create replicas, node_num=%d replica_num=%d", len(nodeInfos), len(replicas))
 	}
 
 	sort.Slice(nodeInfos, func(i, j int) bool {

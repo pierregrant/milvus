@@ -156,55 +156,57 @@ func (q *queryShard) search(ctx context.Context, req *querypb.SearchRequest) (*i
 		}
 		defer deleteSearchResults(streamingResults)
 
-		// reduce search results
-		numSegment := int64(len(streamingResults))
-		err = reduceSearchResultsAndFillData(plan, streamingResults, numSegment)
-		if err != nil {
-			return nil, err
-		}
-		marshaledHits, err := reorganizeSearchResults(streamingResults, numSegment)
-		if err != nil {
-			return nil, err
-		}
-		defer deleteMarshaledHits(marshaledHits)
+		if len(streamingResults) > 0 {
+			// reduce search results
+			numSegment := int64(len(streamingResults))
+			err = reduceSearchResultsAndFillData(plan, streamingResults, numSegment)
+			if err != nil {
+				return nil, err
+			}
+			marshaledHits, err := reorganizeSearchResults(streamingResults, numSegment)
+			if err != nil {
+				return nil, err
+			}
+			defer deleteMarshaledHits(marshaledHits)
 
-		// transform (hard to understand)
-		hitsBlob, err := marshaledHits.getHitsBlob()
-		if err != nil {
-			return nil, err
-		}
+			// transform (hard to understand)
+			hitsBlob, err := marshaledHits.getHitsBlob()
+			if err != nil {
+				return nil, err
+			}
 
-		hitBlobSizePeerQuery, err := marshaledHits.hitBlobSizeInGroup(int64(0))
-		if err != nil {
-			return nil, err
-		}
+			hitBlobSizePeerQuery, err := marshaledHits.hitBlobSizeInGroup(int64(0))
+			if err != nil {
+				return nil, err
+			}
 
-		var offset int64
-		hits := make([][]byte, len(hitBlobSizePeerQuery))
-		for i, length := range hitBlobSizePeerQuery {
-			hits[i] = hitsBlob[offset : offset+length]
-			offset += length
-		}
+			var offset int64
+			hits := make([][]byte, len(hitBlobSizePeerQuery))
+			for i, length := range hitBlobSizePeerQuery {
+				hits[i] = hitsBlob[offset : offset+length]
+				offset += length
+			}
 
-		transformed, err := translateHits(schemaHelper, req.Req.OutputFieldsId, hits)
-		if err != nil {
-			return nil, err
-		}
-		byteBlobs, err := proto.Marshal(transformed)
-		if err != nil {
-			return nil, err
-		}
+			transformed, err := translateHits(schemaHelper, req.Req.OutputFieldsId, hits)
+			if err != nil {
+				return nil, err
+			}
+			byteBlobs, err := proto.Marshal(transformed)
+			if err != nil {
+				return nil, err
+			}
 
-		// complete results with merged streaming result
-		results = append(results, &internalpb.SearchResults{
-			Status:         &commonpb.Status{ErrorCode: commonpb.ErrorCode_Success},
-			MetricType:     plan.getMetricType(),
-			NumQueries:     queryNum,
-			TopK:           topK,
-			SlicedBlob:     byteBlobs,
-			SlicedOffset:   1,
-			SlicedNumCount: 1,
-		})
+			// complete results with merged streaming result
+			results = append(results, &internalpb.SearchResults{
+				Status:         &commonpb.Status{ErrorCode: commonpb.ErrorCode_Success},
+				MetricType:     plan.getMetricType(),
+				NumQueries:     queryNum,
+				TopK:           topK,
+				SlicedBlob:     byteBlobs,
+				SlicedOffset:   1,
+				SlicedNumCount: 1,
+			})
+		}
 
 		// reduce shard search results: unmarshal -> reduce -> marshal
 		searchResultData, err := decodeSearchResults(results)
@@ -277,6 +279,22 @@ func (q *queryShard) search(ctx context.Context, req *querypb.SearchRequest) (*i
 }
 
 func reduceSearchResultData(searchResultData []*schemapb.SearchResultData, nq int64, topk int64, metricType string) (*schemapb.SearchResultData, error) {
+	if len(searchResultData) == 0 {
+		return &schemapb.SearchResultData{
+			NumQueries: nq,
+			TopK:       topk,
+			FieldsData: make([]*schemapb.FieldData, 0),
+			Scores:     make([]float32, 0),
+			Ids: &schemapb.IDs{
+				IdField: &schemapb.IDs_IntId{
+					IntId: &schemapb.LongArray{
+						Data: make([]int64, 0),
+					},
+				},
+			},
+			Topks: make([]int64, 0),
+		}, nil
+	}
 	ret := &schemapb.SearchResultData{
 		NumQueries: nq,
 		TopK:       topk,
@@ -384,7 +402,15 @@ func decodeSearchResults(searchResults []*internalpb.SearchResults) ([]*schemapb
 }
 
 func encodeSearchResultData(searchResultData *schemapb.SearchResultData) (searchResults *internalpb.SearchResults, err error) {
+	searchResults = &internalpb.SearchResults{
+		Status: &commonpb.Status{
+			ErrorCode: commonpb.ErrorCode_Success,
+		},
+	}
 	searchResults.SlicedBlob, err = proto.Marshal(searchResultData)
+	if err != nil {
+		return nil, err
+	}
 	return
 }
 

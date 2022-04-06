@@ -393,7 +393,7 @@ func (t *searchTaskV2) searchShard(ctx context.Context, leaders *querypb.ShardLe
 		if err != nil {
 			return err
 		}
-		if result.Status.ErrorCode != commonpb.ErrorCode_Success {
+		if result.GetStatus().GetErrorCode() != commonpb.ErrorCode_Success {
 			return fmt.Errorf("fail to Search, QueryNode ID = %d, reason=%s", nodeID, result.Status.Reason)
 		}
 
