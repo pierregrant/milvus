@@ -159,6 +159,9 @@ func (q *queryShard) search(ctx context.Context, req *querypb.SearchRequest) (*i
 		// reduce search results
 		numSegment := int64(len(streamingResults))
 		err = reduceSearchResultsAndFillData(plan, streamingResults, numSegment)
+		if err != nil {
+			return nil, err
+		}
 		marshaledHits, err := reorganizeSearchResults(streamingResults, numSegment)
 		if err != nil {
 			return nil, err
@@ -176,7 +179,7 @@ func (q *queryShard) search(ctx context.Context, req *querypb.SearchRequest) (*i
 			return nil, err
 		}
 
-		var offset int64 = 0
+		var offset int64
 		hits := make([][]byte, len(hitBlobSizePeerQuery))
 		for i, length := range hitBlobSizePeerQuery {
 			hits[i] = hitsBlob[offset : offset+length]
@@ -225,6 +228,9 @@ func (q *queryShard) search(ctx context.Context, req *querypb.SearchRequest) (*i
 	// reduce search results
 	numSegment := int64(len(searchResults))
 	err = reduceSearchResultsAndFillData(plan, searchResults, numSegment)
+	if err != nil {
+		return nil, err
+	}
 	marshaledHits, err := reorganizeSearchResults(searchResults, numSegment)
 	if err != nil {
 		return nil, err
@@ -242,7 +248,7 @@ func (q *queryShard) search(ctx context.Context, req *querypb.SearchRequest) (*i
 		return nil, err
 	}
 
-	var offset int64 = 0
+	var offset int64
 	hits := make([][]byte, len(hitBlobSizePeerQuery))
 	for i, length := range hitBlobSizePeerQuery {
 		hits[i] = hitsBlob[offset : offset+length]
