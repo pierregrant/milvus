@@ -1725,6 +1725,11 @@ func genSimpleQueryNodeWithMQFactory(ctx context.Context, fac msgstream.Factory)
 	defer qs.close()
 	node.queryService = qs
 
+	// init shard cluster service
+	node.ShardClusterService = newShardClusterService(node.etcdCli, node.session)
+
+	node.queryShardService = newQueryShardService(node.queryNodeLoopCtx, node.historical, node.streaming, node.ShardClusterService)
+
 	node.UpdateStateCode(internalpb.StateCode_Healthy)
 
 	return node, nil

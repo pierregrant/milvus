@@ -585,7 +585,7 @@ func TestImpl_Search(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = node.Search(ctx, nil)
-	assert.Error(t, err)
+	assert.NoError(t, err)
 }
 
 func TestImpl_Query(t *testing.T) {
@@ -596,5 +596,5 @@ func TestImpl_Query(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = node.Query(ctx, nil)
-	assert.Error(t, err)
+	assert.NoError(t, err)
 }
