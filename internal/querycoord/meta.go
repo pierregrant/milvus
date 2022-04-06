@@ -243,13 +243,13 @@ func (m *MetaReplica) reloadFromKV() error {
 					nodes[nodeID] = struct{}{}
 				}
 			}
-			for nodeID, _ := range nodes {
+			for nodeID := range nodes {
 				replica.NodeIds = append(replica.NodeIds, nodeID)
 			}
 
-			shardReplicas := make([]*querypb.ShardReplica, 0, len(dmChannels[collectionInfo.CollectionID]))
+			shardReplicas := make([]*milvuspb.ShardReplica, 0, len(dmChannels[collectionInfo.CollectionID]))
 			for _, dmc := range dmChannels[collectionInfo.CollectionID] {
-				shardReplicas = append(shardReplicas, &querypb.ShardReplica{
+				shardReplicas = append(shardReplicas, &milvuspb.ShardReplica{
 					LeaderID: dmc.NodeIDLoaded,
 					// LeaderAddr: Will set it after the cluster is reloaded
 					DmChannelName: dmc.DmChannel,
@@ -274,7 +274,7 @@ func (m *MetaReplica) reloadFromKV() error {
 		return err
 	}
 	for i := range replicaKeys {
-		replicaInfo := &querypb.ReplicaInfo{}
+		replicaInfo := &milvuspb.ReplicaInfo{}
 		err = proto.Unmarshal([]byte(replicaValues[i]), replicaInfo)
 		if err != nil {
 			return err
@@ -292,7 +292,7 @@ func (m *MetaReplica) reloadFromKV() error {
 // The leader address is not always valid
 func reloadShardLeaderAddress(meta Meta, cluster Cluster) error {
 	collections := meta.showCollections()
-	replicas := make([]*querypb.ReplicaInfo, 0)
+	replicas := make([]*milvuspb.ReplicaInfo, 0)
 
 	for _, collection := range collections {
 		collectionReplicas, err := meta.getReplicasByCollectionID(collection.CollectionID)
@@ -1167,7 +1167,7 @@ func (m *MetaReplica) generateReplica(collectionID int64, partitionIds []int64) 
 	}, nil
 }
 
-func (m *MetaReplica) addReplica(replica *querypb.ReplicaInfo) error {
+func (m *MetaReplica) addReplica(replica *milvuspb.ReplicaInfo) error {
 	collectionInfo, err := m.getCollectionInfoByID(replica.CollectionID)
 	if err != nil {
 		return err

@@ -31,6 +31,7 @@ import (
 	"github.com/milvus-io/milvus/internal/metrics"
 	"github.com/milvus-io/milvus/internal/proto/commonpb"
 	"github.com/milvus-io/milvus/internal/proto/datapb"
+	"github.com/milvus-io/milvus/internal/proto/milvuspb"
 	"github.com/milvus-io/milvus/internal/proto/querypb"
 	"github.com/milvus-io/milvus/internal/util/funcutil"
 	"github.com/milvus-io/milvus/internal/util/timerecord"
@@ -383,7 +384,7 @@ func (lct *loadCollectionTask) execute(ctx context.Context) error {
 	log.Debug("loadCollectionTask: get collection's all partitionIDs", zap.Int64("collectionID", collectionID), zap.Int64s("partitionIDs", partitionIds), zap.Int64("msgID", lct.Base.MsgID))
 
 	var (
-		replicas          = make([]*querypb.ReplicaInfo, lct.ReplicaNumber)
+		replicas          = make([]*milvuspb.ReplicaInfo, lct.ReplicaNumber)
 		replicaIds        = make([]int64, lct.ReplicaNumber)
 		segmentLoadInfos  = make([]*querypb.SegmentLoadInfo, 0)
 		deltaChannelInfos = make([]*datapb.VchannelInfo, 0)
@@ -515,7 +516,7 @@ func (lct *loadCollectionTask) execute(ctx context.Context) error {
 					lct.setResultInfo(err)
 					return err
 				}
-				replica.ShardReplicas = append(replica.ShardReplicas, &querypb.ShardReplica{
+				replica.ShardReplicas = append(replica.ShardReplicas, &milvuspb.ShardReplica{
 					LeaderID:      task.NodeID,
 					LeaderAddr:    nodeInfo.(*queryNode).address,
 					DmChannelName: task.WatchDmChannelsRequest.Infos[0].ChannelName,
@@ -814,7 +815,7 @@ func (lpt *loadPartitionTask) execute(ctx context.Context) error {
 	partitionIDs := lpt.PartitionIDs
 
 	var (
-		replicas          = make([]*querypb.ReplicaInfo, lpt.ReplicaNumber)
+		replicas          = make([]*milvuspb.ReplicaInfo, lpt.ReplicaNumber)
 		replicaIds        = make([]int64, lpt.ReplicaNumber)
 		segmentLoadInfos  = make([]*querypb.SegmentLoadInfo, 0)
 		deltaChannelInfos = make([]*datapb.VchannelInfo, 0)
@@ -943,7 +944,7 @@ func (lpt *loadPartitionTask) execute(ctx context.Context) error {
 					return err
 				}
 
-				replica.ShardReplicas = append(replica.ShardReplicas, &querypb.ShardReplica{
+				replica.ShardReplicas = append(replica.ShardReplicas, &milvuspb.ShardReplica{
 					LeaderID:      task.NodeID,
 					LeaderAddr:    nodeInfo.(*queryNode).address,
 					DmChannelName: task.WatchDmChannelsRequest.Infos[0].ChannelName,
@@ -2169,7 +2170,7 @@ func (lbt *loadBalanceTask) execute(ctx context.Context) error {
 	return nil
 }
 
-func (lbt *loadBalanceTask) getReplica(nodeID, collectionID int64) (*querypb.ReplicaInfo, error) {
+func (lbt *loadBalanceTask) getReplica(nodeID, collectionID int64) (*milvuspb.ReplicaInfo, error) {
 	replicas, err := lbt.meta.getReplicasByNodeID(nodeID)
 	if err != nil {
 		return nil, err

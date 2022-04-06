@@ -77,7 +77,7 @@ type Cluster interface {
 	allocateSegmentsToQueryNode(ctx context.Context, reqs []*querypb.LoadSegmentsRequest, wait bool, excludeNodeIDs []int64, includeNodeIDs []int64, replicaID int64) error
 	allocateChannelsToQueryNode(ctx context.Context, reqs []*querypb.WatchDmChannelsRequest, wait bool, excludeNodeIDs []int64, includeNodeIDs []int64, replicaID int64) error
 
-	assignNodesToReplicas(ctx context.Context, replicas []*querypb.ReplicaInfo, collectionSize uint64) error
+	assignNodesToReplicas(ctx context.Context, replicas []*milvuspb.ReplicaInfo, collectionSize uint64) error
 
 	getSessionVersion() int64
 
@@ -701,12 +701,12 @@ func (c *queryNodeCluster) allocateSegmentsToQueryNode(ctx context.Context, reqs
 	return c.segmentAllocator(ctx, reqs, c, c.clusterMeta, wait, excludeNodeIDs, includeNodeIDs, replicaID)
 }
 
-func (c *queryNodeCluster) allocateChannelsToQueryNode(ctx context.Context, reqs []*querypb.WatchDmChannelsRequest, wait bool, excludeNodeIDs []int64, includeNodeIDs []int64,replicaID int64) error {
-	return c.channelAllocator(ctx, reqs, c, c.clusterMeta, wait, excludeNodeIDs,includeNodeIDs, replicaID)
+func (c *queryNodeCluster) allocateChannelsToQueryNode(ctx context.Context, reqs []*querypb.WatchDmChannelsRequest, wait bool, excludeNodeIDs []int64, includeNodeIDs []int64, replicaID int64) error {
+	return c.channelAllocator(ctx, reqs, c, c.clusterMeta, wait, excludeNodeIDs, includeNodeIDs, replicaID)
 }
 
 // Return error if no enough nodes/resources to create replicas
-func (c *queryNodeCluster) assignNodesToReplicas(ctx context.Context, replicas []*querypb.ReplicaInfo, collectionSize uint64) error {
+func (c *queryNodeCluster) assignNodesToReplicas(ctx context.Context, replicas []*milvuspb.ReplicaInfo, collectionSize uint64) error {
 	nodeIds := c.onlineNodeIDs()
 	if len(nodeIds) < len(replicas) {
 		return fmt.Errorf("no enough nodes to create replicas, node_num=%d replica_num=%d", len(nodeIds), len(replicas))

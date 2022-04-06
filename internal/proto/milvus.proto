@@ -860,8 +860,6 @@ message ShardReplica {
     repeated int64 node_ids = 4;
 }
 
-
-
 service ProxyService {
   rpc RegisterLink(RegisterLinkRequest) returns (RegisterLinkResponse) {}
 }
@@ -899,3 +897,4 @@ message ListCredUsersRequest {
   // Not useful for now
   common.MsgBase base = 1;
 }
+

@@ -40,6 +40,7 @@ import (
 	"github.com/milvus-io/milvus/internal/mq/msgstream"
 	"github.com/milvus-io/milvus/internal/proto/commonpb"
 	"github.com/milvus-io/milvus/internal/proto/internalpb"
+	"github.com/milvus-io/milvus/internal/proto/milvuspb"
 	"github.com/milvus-io/milvus/internal/proto/querypb"
 	"github.com/milvus-io/milvus/internal/storage"
 	"github.com/milvus-io/milvus/internal/types"
@@ -439,7 +440,7 @@ func (qc *QueryCoord) applyBalancePlan(p *balancePlan) error {
 	return nil
 }
 
-func removeNodeFromReplica(replica *querypb.ReplicaInfo, nodeID int64) *querypb.ReplicaInfo {
+func removeNodeFromReplica(replica *milvuspb.ReplicaInfo, nodeID int64) *milvuspb.ReplicaInfo {
 	for i := 0; i < len(replica.NodeIds); i++ {
 		if replica.NodeIds[i] != nodeID {
 			continue
