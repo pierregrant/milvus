@@ -225,6 +225,7 @@ message SegmentLoadInfo {
   repeated int64 compactionFrom = 10; // segmentIDs compacted from
   repeated FieldIndexInfo index_infos = 11;
   int64 segment_size = 12;
+  string insert_channel = 13;
 }
 
 message FieldIndexInfo {

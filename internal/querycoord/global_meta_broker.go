@@ -423,13 +423,14 @@ func (broker *globalMetaBroker) generateSegmentLoadInfo(ctx context.Context,
 	schema *schemapb.CollectionSchema) *querypb.SegmentLoadInfo {
 	segmentID := segmentBinlog.SegmentID
 	segmentLoadInfo := &querypb.SegmentLoadInfo{
-		SegmentID:    segmentID,
-		PartitionID:  partitionID,
-		CollectionID: collectionID,
-		BinlogPaths:  segmentBinlog.FieldBinlogs,
-		NumOfRows:    segmentBinlog.NumOfRows,
-		Statslogs:    segmentBinlog.Statslogs,
-		Deltalogs:    segmentBinlog.Deltalogs,
+		SegmentID:     segmentID,
+		PartitionID:   partitionID,
+		CollectionID:  collectionID,
+		BinlogPaths:   segmentBinlog.FieldBinlogs,
+		NumOfRows:     segmentBinlog.NumOfRows,
+		Statslogs:     segmentBinlog.Statslogs,
+		Deltalogs:     segmentBinlog.Deltalogs,
+		InsertChannel: segmentBinlog.InsertChannel,
 	}
 	if setIndex {
 		// if index not exist, load binlog to query node
