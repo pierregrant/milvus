@@ -2,12 +2,12 @@ package proxy
 
 import (
 	"context"
-	// "errors"
+	"errors"
 	// "fmt"
 	// "strconv"
 	// "sync"
 	"testing"
-	// "time"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/assert"
@@ -22,13 +22,13 @@ import (
 	"github.com/milvus-io/milvus/internal/proto/commonpb"
 	"github.com/milvus-io/milvus/internal/proto/internalpb"
 	"github.com/milvus-io/milvus/internal/proto/milvuspb"
-	// "github.com/milvus-io/milvus/internal/proto/querypb"
+	"github.com/milvus-io/milvus/internal/proto/querypb"
 	"github.com/milvus-io/milvus/internal/proto/schemapb"
 
-	// "github.com/milvus-io/milvus/internal/util/distance"
+	"github.com/milvus-io/milvus/internal/util/distance"
 	"github.com/milvus-io/milvus/internal/util/funcutil"
 	"github.com/milvus-io/milvus/internal/util/timerecord"
-	// "github.com/milvus-io/milvus/internal/util/typeutil"
+	"github.com/milvus-io/milvus/internal/util/typeutil"
 	// "github.com/milvus-io/milvus/internal/util/uniquegenerator"
 )
 
@@ -183,209 +183,163 @@ func TestSearchTaskV2_PreExecute(t *testing.T) {
 		}
 	})
 
-	// collectionID, err := globalMetaCache.GetCollectionID(ctx, collectionName)
+	t.Run("test checkIfLoaded error", func(t *testing.T) {
+		collID, err := globalMetaCache.GetCollectionID(context.TODO(), collectionName)
+		require.NoError(t, err)
+		task := getSearchTask(t)
+		qc.SetShowCollectionsFunc(func(ctx context.Context, request *querypb.ShowCollectionsRequest) (*querypb.ShowCollectionsResponse, error) {
+			return nil, errors.New("mock")
+		})
 
-	// mock show collections of QueryCoord
-	// qc.SetShowCollectionsFunc(func(ctx context.Context, request *querypb.ShowCollectionsRequest) (*querypb.ShowCollectionsResponse, error) {
-	//     return nil, errors.New("mock")
-	// })
-	// assert.Error(t, task.PreExecute(ctx))
-	// qc.SetShowCollectionsFunc(func(ctx context.Context, request *querypb.ShowCollectionsRequest) (*querypb.ShowCollectionsResponse, error) {
-	//     return &querypb.ShowCollectionsResponse{
-	//         Status: &commonpb.Status{
-	//             ErrorCode: commonpb.ErrorCode_UnexpectedError,
-	//             Reason:    "mock",
-	//         },
-	//     }, nil
-	// })
-	// assert.Error(t, task.PreExecute(ctx))
-	// qc.ResetShowCollectionsFunc()
-	//
-	// // collection not loaded
-	// assert.Error(t, task.PreExecute(ctx))
-	// _, _ = qc.LoadCollection(ctx, &querypb.LoadCollectionRequest{
-	//     Base: &commonpb.MsgBase{
-	//         MsgType:   commonpb.MsgType_LoadCollection,
-	//         MsgID:     0,
-	//         Timestamp: 0,
-	//         SourceID:  0,
-	//     },
-	//     DbID:         0,
-	//     CollectionID: collectionID,
-	//     Schema:       nil,
-	// })
-	//
-	// // no anns field
-	// task.request.DslType = commonpb.DslType_BoolExprV1
-	// assert.Error(t, task.PreExecute(ctx))
-	// task.request.SearchParams = []*commonpb.KeyValuePair{
-	//     {
-	//         Key:   AnnsFieldKey,
-	//         Value: floatVecField,
-	//     },
-	// }
-	//
-	// // no topk
-	// assert.Error(t, task.PreExecute(ctx))
-	// task.request.SearchParams = []*commonpb.KeyValuePair{
-	//     {
-	//         Key:   AnnsFieldKey,
-	//         Value: floatVecField,
-	//     },
-	//     {
-	//         Key:   TopKKey,
-	//         Value: "invalid",
-	//     },
-	// }
-	//
-	// // invalid topk
-	// assert.Error(t, task.PreExecute(ctx))
-	// task.request.SearchParams = []*commonpb.KeyValuePair{
-	//     {
-	//         Key:   AnnsFieldKey,
-	//         Value: floatVecField,
-	//     },
-	//     {
-	//         Key:   TopKKey,
-	//         Value: "10",
-	//     },
-	// }
-	//
-	// // no metric type
-	// assert.Error(t, task.PreExecute(ctx))
-	// task.request.SearchParams = []*commonpb.KeyValuePair{
-	//     {
-	//         Key:   AnnsFieldKey,
-	//         Value: floatVecField,
-	//     },
-	//     {
-	//         Key:   TopKKey,
-	//         Value: "10",
-	//     },
-	//     {
-	//         Key:   MetricTypeKey,
-	//         Value: distance.L2,
-	//     },
-	// }
-	//
-	// // no search params
-	// assert.Error(t, task.PreExecute(ctx))
-	// task.request.SearchParams = []*commonpb.KeyValuePair{
-	//     {
-	//         Key:   AnnsFieldKey,
-	//         Value: int64Field,
-	//     },
-	//     {
-	//         Key:   TopKKey,
-	//         Value: "10",
-	//     },
-	//     {
-	//         Key:   MetricTypeKey,
-	//         Value: distance.L2,
-	//     },
-	//     {
-	//         Key:   SearchParamsKey,
-	//         Value: `{"nprobe": 10}`,
-	//     },
-	// }
-	//
-	// // invalid round_decimal
-	// assert.Error(t, task.PreExecute(ctx))
-	// task.request.SearchParams = []*commonpb.KeyValuePair{
-	//     {
-	//         Key:   AnnsFieldKey,
-	//         Value: int64Field,
-	//     },
-	//     {
-	//         Key:   TopKKey,
-	//         Value: "10",
-	//     },
-	//     {
-	//         Key:   MetricTypeKey,
-	//         Value: distance.L2,
-	//     },
-	//     {
-	//         Key:   SearchParamsKey,
-	//         Value: `{"nprobe": 10}`,
-	//     },
-	//     {
-	//         Key:   RoundDecimalKey,
-	//         Value: "invalid",
-	//     },
-	// }
-	//
-	// // invalid round_decimal
-	// assert.Error(t, task.PreExecute(ctx))
-	// task.request.SearchParams = []*commonpb.KeyValuePair{
-	//     {
-	//         Key:   AnnsFieldKey,
-	//         Value: floatVecField,
-	//     },
-	//     {
-	//         Key:   TopKKey,
-	//         Value: "10",
-	//     },
-	//     {
-	//         Key:   MetricTypeKey,
-	//         Value: distance.L2,
-	//     },
-	//     {
-	//         Key:   RoundDecimalKey,
-	//         Value: "-1",
-	//     },
-	// }
-	//
-	// // failed to create query plan
-	// assert.Error(t, task.PreExecute(ctx))
-	// task.request.SearchParams = []*commonpb.KeyValuePair{
-	//     {
-	//         Key:   AnnsFieldKey,
-	//         Value: floatVecField,
-	//     },
-	//     {
-	//         Key:   TopKKey,
-	//         Value: "10",
-	//     },
-	//     {
-	//         Key:   MetricTypeKey,
-	//         Value: distance.L2,
-	//     },
-	//     {
-	//         Key:   SearchParamsKey,
-	//         Value: `{"nprobe": 10}`,
-	//     },
-	//     {
-	//         Key:   RoundDecimalKey,
-	//         Value: "-1",
-	//     },
-	// }
-	//
-	// // search task with timeout
-	// ctx1, cancel := context.WithTimeout(ctx, time.Second)
-	// defer cancel()
-	// // before preExecute
-	// assert.Equal(t, typeutil.ZeroTimestamp, task.TimeoutTimestamp)
-	// task.ctx = ctx1
-	// assert.NoError(t, task.PreExecute(ctx))
-	// // after preExecute
-	// assert.Greater(t, task.TimeoutTimestamp, typeutil.ZeroTimestamp)
-	//
-	// // field not exist
-	// task.request.OutputFields = []string{int64Field + funcutil.GenRandomStr()}
-	// assert.Error(t, task.PreExecute(ctx))
-	// // contain vector field
-	// task.request.OutputFields = []string{floatVecField}
-	// assert.Error(t, task.PreExecute(ctx))
-	// task.request.OutputFields = []string{int64Field}
-	//
-	// // partition
-	// rc.showPartitionsFunc = func(ctx context.Context, request *milvuspb.ShowPartitionsRequest) (*milvuspb.ShowPartitionsResponse, error) {
-	//     return nil, errors.New("mock")
-	// }
-	// assert.Error(t, task.PreExecute(ctx))
-	// rc.showPartitionsFunc = nil
-	//
-	// // TODO(dragondriver): test partition-related error
+		assert.False(t, task.checkIfLoaded(collID))
+
+		qc.SetShowCollectionsFunc(func(ctx context.Context, request *querypb.ShowCollectionsRequest) (*querypb.ShowCollectionsResponse, error) {
+			return &querypb.ShowCollectionsResponse{
+				Status: &commonpb.Status{
+					ErrorCode: commonpb.ErrorCode_UnexpectedError,
+					Reason:    "mock",
+				},
+			}, nil
+		})
+
+		assert.False(t, task.checkIfLoaded(collID))
+		assert.Error(t, task.PreExecute(ctx))
+		qc.ResetShowCollectionsFunc()
+	})
+
+	createColl(t, int64Field, floatVecField, dim, collectionName)
+	collID, err := globalMetaCache.GetCollectionID(context.TODO(), collectionName)
+	require.NoError(t, err)
+	status, err := qc.LoadCollection(ctx, &querypb.LoadCollectionRequest{
+		Base: &commonpb.MsgBase{
+			MsgType: commonpb.MsgType_LoadCollection,
+		},
+		CollectionID: collID,
+	})
+	require.NoError(t, err)
+	require.Equal(t, commonpb.ErrorCode_Success, status.GetErrorCode())
+
+	t.Run("invalid key value pairs", func(t *testing.T) {
+		spNoTopk := []*commonpb.KeyValuePair{{
+			Key:   AnnsFieldKey,
+			Value: floatVecField}}
+
+		spInvalidTopk := append(spNoTopk, &commonpb.KeyValuePair{
+			Key:   TopKKey,
+			Value: "invalid",
+		})
+
+		spNoMetricType := append(spNoTopk, &commonpb.KeyValuePair{
+			Key:   TopKKey,
+			Value: "10",
+		})
+
+		spNoSearchParams := append(spNoMetricType, &commonpb.KeyValuePair{
+			Key:   MetricTypeKey,
+			Value: distance.L2,
+		})
+
+		spNoRoundDecimal := append(spNoSearchParams, &commonpb.KeyValuePair{
+			Key:   SearchParamsKey,
+			Value: `{"nprobe": 10}`,
+		})
+
+		spInvalidRoundDecimal := append(spNoRoundDecimal, &commonpb.KeyValuePair{
+			Key:   RoundDecimalKey,
+			Value: "invalid",
+		})
+
+		tests := []struct {
+			description   string
+			invalidParams []*commonpb.KeyValuePair
+		}{
+			{"No topk", spNoTopk},
+			{"Invalid topk", spInvalidTopk},
+			{"No Metric type", spNoMetricType},
+			{"No search params", spNoSearchParams},
+			{"no round decimal", spNoRoundDecimal},
+			{"Invalid round decimal", spInvalidRoundDecimal},
+		}
+
+		task := getSearchTask(t)
+		task.request.DslType = commonpb.DslType_BoolExprV1
+		for _, test := range tests {
+			t.Run(test.description, func(t *testing.T) {
+				assert.Error(t, task.PreExecute(ctx))
+			})
+		}
+	})
+
+	getValidSearchParams := func() []*commonpb.KeyValuePair {
+		return []*commonpb.KeyValuePair{
+			{
+				Key:   AnnsFieldKey,
+				Value: floatVecField,
+			},
+			{
+				Key:   TopKKey,
+				Value: "10",
+			},
+			{
+				Key:   MetricTypeKey,
+				Value: distance.L2,
+			},
+			{
+				Key:   SearchParamsKey,
+				Value: `{"nprobe": 10}`,
+			},
+			{
+				Key:   RoundDecimalKey,
+				Value: "-1",
+			}}
+	}
+
+	t.Run("search with timeout", func(t *testing.T) {
+		task := getSearchTask(t)
+		task.request.SearchParams = getValidSearchParams()
+		task.request.DslType = commonpb.DslType_BoolExprV1
+
+		ctxTimeout, cancel := context.WithTimeout(ctx, time.Second)
+		defer cancel()
+		require.Equal(t, typeutil.ZeroTimestamp, task.TimeoutTimestamp)
+
+		task.ctx = ctxTimeout
+		assert.NoError(t, task.PreExecute(ctx))
+		assert.Greater(t, task.TimeoutTimestamp, typeutil.ZeroTimestamp)
+	})
+
+	t.Run("field not exist", func(t *testing.T) {
+		task := getSearchTask(t)
+		task.request.DslType = commonpb.DslType_BoolExprV1
+		task.request.SearchParams = getValidSearchParams()
+
+		task.request.OutputFields = []string{int64Field + funcutil.GenRandomStr()}
+		assert.Error(t, task.PreExecute(ctx))
+	})
+
+	t.Run("contain vector field", func(t *testing.T) {
+		task := getSearchTask(t)
+		task.request.DslType = commonpb.DslType_BoolExprV1
+		task.request.SearchParams = getValidSearchParams()
+
+		task.request.OutputFields = []string{floatVecField}
+		assert.Error(t, task.PreExecute(ctx))
+	})
+
+	t.Run("show partition failed", func(t *testing.T) {
+		task := getSearchTask(t)
+		task.request.DslType = commonpb.DslType_BoolExprV1
+		task.request.SearchParams = getValidSearchParams()
+		task.request.OutputFields = []string{int64Field}
+
+		rc.showPartitionsFunc = func(ctx context.Context, request *milvuspb.ShowPartitionsRequest) (*milvuspb.ShowPartitionsResponse, error) {
+			return nil, errors.New("mock")
+		}
+		assert.Error(t, task.PreExecute(ctx))
+		rc.showPartitionsFunc = nil
+
+	})
+	// TODO: test partition-related error
 }
 
 func TestSearchTaskV2_Ts(t *testing.T) {
