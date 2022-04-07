@@ -152,6 +152,7 @@ func (q *queryShard) search(ctx context.Context, req *querypb.SearchRequest) (*i
 		// shard leader queries its own streaming data
 		streamingResults, _, _, err := q.streaming.search(searchRequests, collectionID, req.Req.PartitionIDs, req.DmlChannel, plan, timestamp)
 		if err != nil {
+			log.Warn("search streaming data err", zap.Error(err))
 			return nil, err
 		}
 		defer deleteSearchResults(streamingResults)
@@ -211,13 +212,20 @@ func (q *queryShard) search(ctx context.Context, req *querypb.SearchRequest) (*i
 		// reduce shard search results: unmarshal -> reduce -> marshal
 		searchResultData, err := decodeSearchResults(results)
 		if err != nil {
+			log.Warn("decode search results error", zap.Error(err))
 			return nil, err
 		}
 		reducedResultData, err := reduceSearchResultData(searchResultData, queryNum, plan.getTopK(), plan.getMetricType())
 		if err != nil {
+			log.Warn("reduce search results error", zap.Error(err))
 			return nil, err
 		}
-		return encodeSearchResultData(reducedResultData, queryNum, plan.getTopK(), plan.getMetricType())
+		searchResults, err := encodeSearchResultData(reducedResultData, queryNum, plan.getTopK(), plan.getMetricType())
+		if err != nil {
+			log.Warn("encode search results error", zap.Error(err))
+			return nil, err
+		}
+		return searchResults, nil
 	}
 
 	// search each segments by segment IDs in request
@@ -483,7 +491,9 @@ func (q *queryShard) query(ctx context.Context, req *querypb.QueryRequest) (*int
 			FieldsData: streamingResult.FieldsData,
 		})
 		// merge shard query results
-		return mergeInternalRetrieveResults(results)
+		mergedResults, err := mergeInternalRetrieveResults(results)
+		log.Debug("leader retrieve result", zap.String("channel", req.DmlChannel), zap.String("ids", mergedResults.Ids.String()))
+		return mergedResults, err
 	}
 
 	// shard follower considers solely historical segments
@@ -496,7 +506,7 @@ func (q *queryShard) query(ctx context.Context, req *querypb.QueryRequest) (*int
 		return nil, err
 	}
 
-	log.Debug("retrieve result", zap.String("ids", mergedResult.Ids.String()))
+	log.Debug("follower retrieve result", zap.String("ids", mergedResult.Ids.String()))
 	RetrieveResults := &internalpb.RetrieveResults{
 		Status:     &commonpb.Status{ErrorCode: commonpb.ErrorCode_Success},
 		Ids:        mergedResult.Ids,
@@ -513,6 +523,10 @@ func mergeInternalRetrieveResults(retrieveResults []*internalpb.RetrieveResults)
 
 	// merge results and remove duplicates
 	for _, rr := range retrieveResults {
+		// skip if fields data is empty
+		if len(rr.FieldsData) == 0 {
+			continue
+		}
 
 		if ret == nil {
 			ret = &internalpb.RetrieveResults{
@@ -527,12 +541,8 @@ func mergeInternalRetrieveResults(retrieveResults []*internalpb.RetrieveResults)
 			}
 		}
 
-		// skip if fields data is empty
-		if len(rr.FieldsData) == 0 {
-			continue
-		}
-
 		if len(ret.FieldsData) != len(rr.FieldsData) {
+			log.Warn("mismatch FieldData in RetrieveResults")
 			return nil, fmt.Errorf("mismatch FieldData in RetrieveResults")
 		}
 
