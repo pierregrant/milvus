@@ -246,6 +246,7 @@ message LoadSegmentsRequest {
   int64 source_nodeID = 5;
   int64 collectionID = 6;
   LoadMetaInfo load_meta = 7;
+  int64 replicaID = 8;
 }
 
 message ReleaseSegmentsRequest {
