@@ -527,6 +527,11 @@ func mergeInternalRetrieveResults(retrieveResults []*internalpb.RetrieveResults)
 			}
 		}
 
+		// skip if fields data is empty
+		if len(rr.FieldsData) == 0 {
+			continue
+		}
+
 		if len(ret.FieldsData) != len(rr.FieldsData) {
 			return nil, fmt.Errorf("mismatch FieldData in RetrieveResults")
 		}
