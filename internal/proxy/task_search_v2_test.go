@@ -4,14 +4,15 @@ import (
 	"context"
 	// "errors"
 	// "fmt"
-	"strconv"
+	// "strconv"
 	// "sync"
 	"testing"
 	// "time"
 
-	// "github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/assert"
-	// "go.uber.org/zap"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
 	// "github.com/milvus-io/milvus/internal/common"
@@ -20,15 +21,12 @@ import (
 
 	"github.com/milvus-io/milvus/internal/proto/commonpb"
 	"github.com/milvus-io/milvus/internal/proto/internalpb"
-
-	// "github.com/milvus-io/milvus/internal/proto/milvuspb"
-
-	// "github.com/milvus-io/milvus/internal/proto/milvuspb"
+	"github.com/milvus-io/milvus/internal/proto/milvuspb"
 	// "github.com/milvus-io/milvus/internal/proto/querypb"
 	"github.com/milvus-io/milvus/internal/proto/schemapb"
 
 	// "github.com/milvus-io/milvus/internal/util/distance"
-	// "github.com/milvus-io/milvus/internal/util/funcutil"
+	"github.com/milvus-io/milvus/internal/util/funcutil"
 	"github.com/milvus-io/milvus/internal/util/timerecord"
 	// "github.com/milvus-io/milvus/internal/util/typeutil"
 	// "github.com/milvus-io/milvus/internal/util/uniquegenerator"
@@ -47,194 +45,147 @@ func TestSearchTaskV2_PostExecute(t *testing.T) {
 					MsgType:  commonpb.MsgType_Search,
 					SourceID: Params.ProxyCfg.ProxyID,
 				},
-				ResultChannelID: strconv.FormatInt(Params.ProxyCfg.ProxyID, 10),
 			},
 			request: nil,
 			qc:      nil,
 			tr:      timerecord.NewTimeRecorder("search"),
 
-			resultBuf:       make(chan *internalpb.SearchResults, 10), // TODO
+			resultBuf:       make(chan *internalpb.SearchResults, 10),
 			toReduceResults: make([]*internalpb.SearchResults, 0),
 		}
+		// no result
+		qt.resultBuf <- &internalpb.SearchResults{}
 
 		qt.runningGroup, qt.runningGroupCtx = errgroup.WithContext(ctx)
 		for i := 0; i <= 2; i++ {
+			num := i
 			qt.runningGroup.Go(func() error {
-				log.Debug("returning error groups")
+				log.Debug("returning error groups", zap.Int("No.", num))
 				return nil
 			})
 		}
 
-		// no result
-		qt.resultBuf <- &internalpb.SearchResults{}
 		err := qt.PostExecute(context.TODO())
 		assert.NoError(t, err)
-		assert.Equal(t, qt.result.Status.ErrorCode, commonpb.ErrorCode_Success)
-
-		// test trace context done
-		// cancel()
-		// err = qt.PostExecute(context.TODO())
-		// assert.NotNil(t, err)
+		assert.Equal(t, qt.result.Status.ErrorCode, commonpb.ErrorCode_UnexpectedError)
 	})
 }
 
-func TestSearchTaskV2_Channels(t *testing.T) {
-	// var err error
-	//
-	// Params.Init()
-	//
-	// rc := NewRootCoordMock()
-	// rc.Start()
-	// defer rc.Stop()
-	//
-	// ctx := context.Background()
-	//
-	// err = InitMetaCache(rc)
-	// assert.NoError(t, err)
-	//
-	// dmlChannelsFunc := getDmlChannelsFunc(ctx, rc)
-	// query := newMockGetChannelsService()
-	// factory := newSimpleMockMsgStreamFactory()
-	//
-	// prefix := "TestSearchTaskV2_Channels"
-	// collectionName := prefix + funcutil.GenRandomStr()
-	// shardsNum := int32(2)
-	// dbName := ""
-	// int64Field := "int64"
-	// floatVecField := "fvec"
-	// dim := 128
-	//
-	// task := &searchTaskV2{
-	//     ctx: ctx,
-	//     request: &milvuspb.SearchRequest{
-	//         CollectionName: collectionName,
-	//     },
-	//     tr:    timerecord.NewTimeRecorder("search"),
-	// }
-	//
-	// // collection not exist
-	// _, err = task.getVChannels()
-	// assert.Error(t, err)
-	// _, err = task.getVChannels()
-	// assert.Error(t, err)
-	//
-	// schema := constructCollectionSchema(int64Field, floatVecField, dim, collectionName)
-	// marshaledSchema, err := proto.Marshal(schema)
-	// assert.NoError(t, err)
-	//
-	// createColT := &createCollectionTask{
-	//     Condition: NewTaskCondition(ctx),
-	//     CreateCollectionRequest: &milvuspb.CreateCollectionRequest{
-	//         Base:           nil,
-	//         DbName:         dbName,
-	//         CollectionName: collectionName,
-	//         Schema:         marshaledSchema,
-	//         ShardsNum:      shardsNum,
-	//     },
-	//     ctx:       ctx,
-	//     rootCoord: rc,
-	//     result:    nil,
-	//     schema:    nil,
-	// }
-	//
-	// assert.NoError(t, createColT.OnEnqueue())
-	// assert.NoError(t, createColT.PreExecute(ctx))
-	// assert.NoError(t, createColT.Execute(ctx))
-	// assert.NoError(t, createColT.PostExecute(ctx))
-	//
-	// _, err = task.getChannels()
-	// assert.NoError(t, err)
-	// _, err = task.getVChannels()
-	// assert.NoError(t, err)
-	//
-	// _, err = task.getChannels()
-	// assert.Error(t, err)
-	// _, err = task.getVChannels()
-	// assert.Error(t, err)
-}
-
 func TestSearchTaskV2_PreExecute(t *testing.T) {
-	// var err error
-	//
-	// Params.Init()
-	// Params.ProxyCfg.SearchResultChannelNames = []string{funcutil.GenRandomStr()}
-	//
-	// rc := NewRootCoordMock()
-	// rc.Start()
-	// defer rc.Stop()
-	//
-	// qc := NewQueryCoordMock()
-	// qc.Start()
-	// defer qc.Stop()
-	//
-	// ctx := context.Background()
-	//
-	// err = InitMetaCache(rc)
-	// assert.NoError(t, err)
-	//
-	// dmlChannelsFunc := getDmlChannelsFunc(ctx, rc)
-	// query := newMockGetChannelsService()
-	// factory := newSimpleMockMsgStreamFactory()
-	//
-	// prefix := "TestSearchTaskV2_PreExecute"
-	// collectionName := prefix + funcutil.GenRandomStr()
-	// shardsNum := int32(2)
-	// dbName := ""
-	// int64Field := "int64"
-	// floatVecField := "fvec"
-	// dim := 128
-	//
-	// task := &searchTaskV2{
-	//     ctx:           ctx,
-	//     SearchRequest: &internalpb.SearchRequest{},
-	//     request: &milvuspb.SearchRequest{
-	//         CollectionName: collectionName,
-	//     },
-	//     qc:    qc,
-	//     tr:    timerecord.NewTimeRecorder("search"),
-	// }
-	// assert.NoError(t, task.OnEnqueue())
-	//
-	// // collection not exist
-	// assert.Error(t, task.PreExecute(ctx))
-	//
-	// schema := constructCollectionSchema(int64Field, floatVecField, dim, collectionName)
-	// marshaledSchema, err := proto.Marshal(schema)
-	// assert.NoError(t, err)
-	//
-	// createColT := &createCollectionTask{
-	//     Condition: NewTaskCondition(ctx),
-	//     CreateCollectionRequest: &milvuspb.CreateCollectionRequest{
-	//         Base:           nil,
-	//         DbName:         dbName,
-	//         CollectionName: collectionName,
-	//         Schema:         marshaledSchema,
-	//         ShardsNum:      shardsNum,
-	//     },
-	//     ctx:       ctx,
-	//     rootCoord: rc,
-	//     result:    nil,
-	//     schema:    nil,
-	// }
-	//
-	// assert.NoError(t, createColT.OnEnqueue())
-	// assert.NoError(t, createColT.PreExecute(ctx))
-	// assert.NoError(t, createColT.Execute(ctx))
-	// assert.NoError(t, createColT.PostExecute(ctx))
-	//
-	// collectionID, _ := globalMetaCache.GetCollectionID(ctx, collectionName)
-	//
-	// // validateCollectionName
-	// task.request.CollectionName = "$"
-	// assert.Error(t, task.PreExecute(ctx))
-	// task.request.CollectionName = collectionName
-	//
-	// // Validate Partition
-	// task.request.PartitionNames = []string{"$"}
-	// assert.Error(t, task.PreExecute(ctx))
-	// task.request.PartitionNames = nil
-	//
-	// // mock show collections of QueryCoord
+	var err error
+
+	Params.Init()
+	var (
+		rc  = NewRootCoordMock()
+		qc  = NewQueryCoordMock()
+		ctx = context.TODO()
+	)
+
+	err = rc.Start()
+	defer rc.Stop()
+	require.NoError(t, err)
+	err = InitMetaCache(rc)
+	require.NoError(t, err)
+
+	err = qc.Start()
+	defer qc.Stop()
+	require.NoError(t, err)
+
+	var (
+		shardsNum      = int32(2)
+		dim            = 128
+		collectionName = t.Name() + funcutil.GenRandomStr()
+
+		int64Field    = "int64"
+		floatVecField = "fvec"
+	)
+
+	createColl := func(t *testing.T, fInt64 string, fFloatVec string, dim int, name string) {
+		schema := constructCollectionSchema(int64Field, floatVecField, dim, collectionName)
+		marshaledSchema, err := proto.Marshal(schema)
+		require.NoError(t, err)
+
+		createColT := &createCollectionTask{
+			Condition: NewTaskCondition(context.TODO()),
+			CreateCollectionRequest: &milvuspb.CreateCollectionRequest{
+				CollectionName: collectionName,
+				Schema:         marshaledSchema,
+				ShardsNum:      shardsNum,
+			},
+			ctx:       context.TODO(),
+			rootCoord: rc,
+		}
+
+		require.NoError(t, createColT.OnEnqueue())
+		require.NoError(t, createColT.PreExecute(ctx))
+		require.NoError(t, createColT.Execute(ctx))
+		require.NoError(t, createColT.PostExecute(ctx))
+	}
+
+	getSearchTask := func(t *testing.T) *searchTaskV2 {
+		task := &searchTaskV2{
+			ctx:           ctx,
+			SearchRequest: &internalpb.SearchRequest{},
+			request: &milvuspb.SearchRequest{
+				CollectionName: collectionName,
+			},
+			qc: qc,
+			tr: timerecord.NewTimeRecorder("test-search"),
+		}
+		require.NoError(t, task.OnEnqueue())
+		return task
+	}
+
+	t.Run("collection not exist", func(t *testing.T) {
+		task := getSearchTask(t)
+		err = task.PreExecute(ctx)
+		assert.Error(t, err)
+	})
+
+	t.Run("invalid collection name", func(t *testing.T) {
+		task := getSearchTask(t)
+		createColl(t, int64Field, floatVecField, dim, collectionName)
+
+		invalidCollNameTests := []struct {
+			inCollName  string
+			description string
+		}{
+			{"$", "invalid collection name $"},
+			{"0", "invalid collection name 0"},
+		}
+
+		for _, test := range invalidCollNameTests {
+			t.Run(test.description, func(t *testing.T) {
+				task.request.CollectionName = test.inCollName
+				assert.Error(t, task.PreExecute(context.TODO()))
+			})
+		}
+	})
+
+	t.Run("invalid partition names", func(t *testing.T) {
+		task := getSearchTask(t)
+		createColl(t, int64Field, floatVecField, dim, collectionName)
+
+		invalidCollNameTests := []struct {
+			inPartNames []string
+			description string
+		}{
+			{[]string{"$"}, "invalid partition name $"},
+			{[]string{"0"}, "invalid collection name 0"},
+			{[]string{"default", "$"}, "invalid empty partition name"},
+		}
+
+		for _, test := range invalidCollNameTests {
+			t.Run(test.description, func(t *testing.T) {
+				task.request.PartitionNames = test.inPartNames
+				assert.Error(t, task.PreExecute(context.TODO()))
+			})
+		}
+	})
+
+	// collectionID, err := globalMetaCache.GetCollectionID(ctx, collectionName)
+
+	// mock show collections of QueryCoord
 	// qc.SetShowCollectionsFunc(func(ctx context.Context, request *querypb.ShowCollectionsRequest) (*querypb.ShowCollectionsResponse, error) {
 	//     return nil, errors.New("mock")
 	// })
@@ -480,7 +431,6 @@ func TestSearchTaskV2_Execute(t *testing.T) {
 	// prefix := "TestSearchTaskV2_Execute"
 	// collectionName := prefix + funcutil.GenRandomStr()
 	// shardsNum := int32(2)
-	// dbName := ""
 	// int64Field := "int64"
 	// floatVecField := "fvec"
 	// dim := 128
@@ -518,7 +468,6 @@ func TestSearchTaskV2_Execute(t *testing.T) {
 	//     Condition: NewTaskCondition(ctx),
 	//     CreateCollectionRequest: &milvuspb.CreateCollectionRequest{
 	//         Base:           nil,
-	//         DbName:         dbName,
 	//         CollectionName: collectionName,
 	//         Schema:         marshaledSchema,
 	//         ShardsNum:      shardsNum,
@@ -612,7 +561,6 @@ func TestSearchTaskV2WithInvalidRoundDecimal(t *testing.T) {
 	//
 	// shardsNum := int32(2)
 	// prefix := "TestSearchTaskV2_all"
-	// dbName := ""
 	// collectionName := prefix + funcutil.GenRandomStr()
 	//
 	// dim := 128
@@ -641,7 +589,6 @@ func TestSearchTaskV2WithInvalidRoundDecimal(t *testing.T) {
 	//     Condition: NewTaskCondition(ctx),
 	//     CreateCollectionRequest: &milvuspb.CreateCollectionRequest{
 	//         Base:           nil,
-	//         DbName:         dbName,
 	//         CollectionName: collectionName,
 	//         Schema:         marshaledSchema,
 	//         ShardsNum:      shardsNum,
@@ -681,7 +628,7 @@ func TestSearchTaskV2WithInvalidRoundDecimal(t *testing.T) {
 	// assert.NoError(t, err)
 	// assert.Equal(t, commonpb.ErrorCode_Success, status.ErrorCode)
 	//
-	// req := constructSearchRequest(dbName, collectionName,
+	// req := constructSearchRequest("", collectionName,
 	//     expr,
 	//     testFloatVecField,
 	//     nq, dim, nprobe, topk, roundDecimal)
@@ -857,7 +804,6 @@ func TestSearchTaskV2_all(t *testing.T) {
 	//
 	// shardsNum := int32(2)
 	// prefix := "TestSearchTaskV2_all"
-	// dbName := ""
 	// collectionName := prefix + funcutil.GenRandomStr()
 	//
 	// dim := 128
@@ -887,7 +833,6 @@ func TestSearchTaskV2_all(t *testing.T) {
 	//     Condition: NewTaskCondition(ctx),
 	//     CreateCollectionRequest: &milvuspb.CreateCollectionRequest{
 	//         Base:           nil,
-	//         DbName:         dbName,
 	//         CollectionName: collectionName,
 	//         Schema:         marshaledSchema,
 	//         ShardsNum:      shardsNum,
@@ -927,7 +872,7 @@ func TestSearchTaskV2_all(t *testing.T) {
 	// assert.NoError(t, err)
 	// assert.Equal(t, commonpb.ErrorCode_Success, status.ErrorCode)
 	//
-	// req := constructSearchRequest(dbName, collectionName,
+	// req := constructSearchRequest("", collectionName,
 	//     expr,
 	//     testFloatVecField,
 	//     nq, dim, nprobe, topk, roundDecimal)
@@ -1104,7 +1049,6 @@ func TestSearchTaskV2_7803_reduce(t *testing.T) {
 	//
 	// shardsNum := int32(2)
 	// prefix := "TestSearchTaskV2_7803_reduce"
-	// dbName := ""
 	// collectionName := prefix + funcutil.GenRandomStr()
 	// int64Field := "int64"
 	// floatVecField := "fvec"
@@ -1127,7 +1071,6 @@ func TestSearchTaskV2_7803_reduce(t *testing.T) {
 	//     Condition: NewTaskCondition(ctx),
 	//     CreateCollectionRequest: &milvuspb.CreateCollectionRequest{
 	//         Base:           nil,
-	//         DbName:         dbName,
 	//         CollectionName: collectionName,
 	//         Schema:         marshaledSchema,
 	//         ShardsNum:      shardsNum,
@@ -1167,7 +1110,7 @@ func TestSearchTaskV2_7803_reduce(t *testing.T) {
 	// assert.NoError(t, err)
 	// assert.Equal(t, commonpb.ErrorCode_Success, status.ErrorCode)
 	//
-	// req := constructSearchRequest(dbName, collectionName,
+	// req := constructSearchRequest("", collectionName,
 	//     expr,
 	//     floatVecField,
 	//     nq, dim, nprobe, topk, roundDecimal)
