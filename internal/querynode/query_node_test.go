@@ -315,16 +315,17 @@ func genSimpleQueryNodeToTestWatchChangeInfo(ctx context.Context) (*QueryNode, e
 		return nil, err
 	}
 
-	err = node.queryService.addQueryCollection(defaultCollectionID)
-	if err != nil {
-		return nil, err
-	}
+	/*
+		err = node.queryService.addQueryCollection(defaultCollectionID)
+		if err != nil {
+			return nil, err
+		}
 
-	qc, err := node.queryService.getQueryCollection(defaultCollectionID)
-	if err != nil {
-		return nil, err
-	}
-	qc.globalSegmentManager.addGlobalSegmentInfo(genSimpleSegmentInfo())
+		qc, err := node.queryService.getQueryCollection(defaultCollectionID)
+		if err != nil {
+			return nil, err
+		}*/
+	//qc.globalSegmentManager.addGlobalSegmentInfo(genSimpleSegmentInfo())
 	return node, nil
 }
 
@@ -367,10 +368,11 @@ func TestQueryNode_adjustByChangeInfo(t *testing.T) {
 		segmentChangeInfos.Infos[0].OnlineSegments = nil
 		segmentChangeInfos.Infos[0].OfflineNodeID = Params.QueryNodeCfg.QueryNodeID
 
-		qc, err := node.queryService.getQueryCollection(defaultCollectionID)
-		assert.NoError(t, err)
-		qc.globalSegmentManager.removeGlobalSealedSegmentInfo(defaultSegmentID)
-
+		/*
+			qc, err := node.queryService.getQueryCollection(defaultCollectionID)
+			assert.NoError(t, err)
+			qc.globalSegmentManager.removeGlobalSealedSegmentInfo(defaultSegmentID)
+		*/
 		err = node.removeSegments(segmentChangeInfos)
 		assert.Error(t, err)
 	})
@@ -439,9 +441,10 @@ func TestQueryNode_watchChangeInfo(t *testing.T) {
 		segmentChangeInfos.Infos[0].OnlineSegments = nil
 		segmentChangeInfos.Infos[0].OfflineNodeID = Params.QueryNodeCfg.QueryNodeID
 
-		qc, err := node.queryService.getQueryCollection(defaultCollectionID)
-		assert.NoError(t, err)
-		qc.globalSegmentManager.removeGlobalSealedSegmentInfo(defaultSegmentID)
+		/*
+			qc, err := node.queryService.getQueryCollection(defaultCollectionID)
+			assert.NoError(t, err)
+		qc.globalSegmentManager.removeGlobalSealedSegmentInfo(defaultSegmentID)*/
 
 		go node.watchChangeInfo()
 

@@ -21,8 +21,10 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sync"
 
 	"github.com/golang/protobuf/proto"
+	"go.uber.org/atomic"
 	"go.uber.org/zap"
 
 	"github.com/milvus-io/milvus/internal/log"
@@ -33,6 +35,8 @@ import (
 	"github.com/milvus-io/milvus/internal/proto/schemapb"
 	"github.com/milvus-io/milvus/internal/storage"
 	"github.com/milvus-io/milvus/internal/util/distance"
+	"github.com/milvus-io/milvus/internal/util/funcutil"
+	"github.com/milvus-io/milvus/internal/util/tsoutil"
 	"github.com/milvus-io/milvus/internal/util/typeutil"
 )
 
@@ -42,11 +46,18 @@ type queryShard struct {
 
 	collectionID UniqueID
 	channel      Channel
+	deltaChannel Channel
 	replicaID    int64
 
 	clusterService *ShardClusterService
 	historical     *historical
 	streaming      *streaming
+
+	dmTSafeWatcher    *tSafeWatcher
+	deltaTSafeWatcher *tSafeWatcher
+	watcherCond       *sync.Cond
+	serviceDmTs       atomic.Uint64
+	serviceDeltaTs    atomic.Uint64
 
 	localChunkManager  storage.ChunkManager
 	remoteChunkManager storage.ChunkManager
@@ -81,15 +92,158 @@ func newQueryShard(
 		remoteChunkManager: remoteChunkManager,
 		localCacheEnabled:  localCacheEnabled,
 		localCacheSize:     Params.QueryNodeCfg.LocalFileCacheLimit,
+
+		watcherCond: sync.NewCond(&sync.Mutex{}),
 	}
+	deltaChannel, err := funcutil.ConvertChannelName(channel, Params.CommonCfg.RootCoordDml, Params.CommonCfg.RootCoordDelta)
+	if err != nil {
+		log.Warn("failed to convert dm channel to delta", zap.String("channel", channel), zap.Error(err))
+	}
+	qs.deltaChannel = deltaChannel
+
+	qs.initTSafeWatcher()
 	return qs
+}
+
+func (q *queryShard) initTSafeWatcher() error {
+	q.dmTSafeWatcher = newTSafeWatcher()
+	err := q.streaming.tSafeReplica.registerTSafeWatcher(q.channel, q.dmTSafeWatcher)
+	if err != nil {
+		log.Warn("failed to register dml tsafe watcher", zap.String("channel", q.channel), zap.Error(err))
+		return err
+	}
+
+	q.deltaTSafeWatcher = newTSafeWatcher()
+	err = q.streaming.tSafeReplica.registerTSafeWatcher(q.deltaChannel, q.deltaTSafeWatcher)
+	if err != nil {
+		log.Warn("failed to register delta tsafe watcher", zap.String("channel", q.channel), zap.Error(err))
+		return err
+	}
+
+	go q.watchTs(q.dmTSafeWatcher.watcherChan(), q.dmTSafeWatcher.closeCh, tsTypeDML)
+	go q.watchTs(q.dmTSafeWatcher.watcherChan(), q.deltaTSafeWatcher.closeCh, tsTypeDelta)
+
+	return nil
+}
+
+func (q *queryShard) close() {
+	q.cancel()
+	q.historical.tSafeReplica.removeTSafe(q.channel)
+}
+
+type tsType int32
+
+const (
+	tsTypeDML   tsType = 1
+	tsTypeDelta tsType = 2
+)
+
+func (q *queryShard) watchTs(channel <-chan bool, closeCh <-chan struct{}, tp tsType) {
+	for {
+		select {
+		case <-q.ctx.Done():
+			log.Debug("stop queryShard watcher due to ctx done", zap.Int64("collectionID", q.collectionID), zap.String("vChannel", q.channel))
+			return
+		case <-closeCh:
+			log.Debug("stop queryShard watcher due to watcher closed", zap.Int64("collectionID", q.collectionID), zap.String("vChannel", q.channel))
+			return
+		case _, ok := <-channel:
+			if !ok {
+				log.Warn("tsafe watcher channel closed", zap.Int64("collectionID", q.collectionID), zap.String("vChannel", q.channel))
+				return
+			}
+
+			ts, err := q.getNewTSafe(tp)
+			if err == nil {
+				q.watcherCond.L.Lock()
+				q.setServiceableTime(ts, tp)
+				q.watcherCond.Broadcast()
+				q.watcherCond.L.Unlock()
+			}
+		}
+	}
+}
+
+func (q *queryShard) getNewTSafe(tp tsType) (Timestamp, error) {
+	var channel string
+	switch tp {
+	case tsTypeDML:
+		channel = q.channel
+	case tsTypeDelta:
+		channel = q.deltaChannel
+	default:
+		return 0, errors.New("invalid ts type")
+	}
+	t := Timestamp(math.MaxInt64)
+	ts, err := q.streaming.tSafeReplica.getTSafe(channel)
+	if err != nil {
+		return 0, err
+	}
+	if ts <= t {
+		t = ts
+	}
+	return t, nil
+}
+
+func (q *queryShard) waitUntilServiceable(gauranteeTs Timestamp) {
+	q.watcherCond.L.Lock()
+	defer q.watcherCond.L.Unlock()
+	for gauranteeTs > q.getServiceableTime() {
+		q.watcherCond.Wait()
+	}
+}
+
+func (q *queryShard) getServiceableTime() Timestamp {
+	gracefulTimeInMilliSecond := Params.QueryNodeCfg.GracefulTime
+	gracefulTime := typeutil.ZeroTimestamp
+	if gracefulTimeInMilliSecond > 0 {
+		gracefulTime = tsoutil.ComposeTS(gracefulTimeInMilliSecond, 0)
+	}
+	var serviceTs, serviceDeltaTs Timestamp
+	serviceTs = q.serviceDmTs.Load()
+	serviceDeltaTs = q.serviceDeltaTs.Load()
+	if serviceDeltaTs < serviceTs {
+		serviceTs = serviceDeltaTs
+	}
+
+	return serviceTs + gracefulTime
+}
+
+func (q *queryShard) setServiceableTime(t Timestamp, tp tsType) {
+	switch tp {
+	case tsTypeDML:
+		ts := q.serviceDmTs.Load()
+		if t < ts {
+			return
+		}
+		for !q.serviceDmTs.CAS(ts, t) {
+			ts = q.serviceDmTs.Load()
+			if t < ts {
+				return
+			}
+		}
+	case tsTypeDelta:
+		ts := q.serviceDeltaTs.Load()
+		if t < ts {
+			return
+		}
+		for !q.serviceDeltaTs.CAS(ts, t) {
+			ts = q.serviceDeltaTs.Load()
+			if t < ts {
+				return
+			}
+		}
+	}
 }
 
 func (q *queryShard) search(ctx context.Context, req *querypb.SearchRequest) (*internalpb.SearchResults, error) {
 	collectionID := req.Req.CollectionID
 	segmentIDs := req.SegmentIDs
 	timestamp := req.Req.TravelTimestamp
-	// TODO: hold request until guarantee timestamp >= service timestamp
+
+	// hold request until guarantee timestamp >= service timestamp
+	guaranteeTs := req.GetReq().GetGuaranteeTimestamp()
+	q.waitUntilServiceable(guaranteeTs)
 
 	q.historical.replica.queryRLock()
 	q.streaming.replica.queryRLock()
@@ -431,7 +585,10 @@ func (q *queryShard) query(ctx context.Context, req *querypb.QueryRequest) (*int
 	partitionIDs := req.Req.PartitionIDs
 	expr := req.Req.SerializedExprPlan
 	timestamp := req.Req.TravelTimestamp
-	// TODO: hold request until guarantee timestamp >= service timestamp
+
+	// hold request until guarantee timestamp >= service timestamp
+	guaranteeTs := req.GetReq().GetGuaranteeTimestamp()
+	q.waitUntilServiceable(guaranteeTs)
 
 	// deserialize query plan
 	collection, err := q.streaming.replica.getCollectionByID(collectionID)

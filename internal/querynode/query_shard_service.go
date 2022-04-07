@@ -119,3 +119,14 @@ func (q *queryShardService) getQueryShard(channel Channel) (*queryShard, error) 
 	}
 	return q.queryShards[channel], nil
 }
+
+func (q *queryShardService) close() {
+	q.cancel()
+	q.queryShardsMu.Lock()
+	defer q.queryShardsMu.Unlock()
+
+	for _, queryShard := range q.queryShards {
+		//TODO change to query shard close function
+		queryShard.cancel()
+	}
+}

@@ -27,7 +27,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/milvus-io/milvus/internal/log"
-	"github.com/milvus-io/milvus/internal/metrics"
 	"github.com/milvus-io/milvus/internal/proto/commonpb"
 	"github.com/milvus-io/milvus/internal/proto/datapb"
 	"github.com/milvus-io/milvus/internal/proto/internalpb"
@@ -132,66 +131,71 @@ func (r *addQueryChannelTask) Execute(ctx context.Context) error {
 	log.Debug("Execute addQueryChannelTask",
 		zap.Any("collectionID", r.req.CollectionID))
 
-	collectionID := r.req.CollectionID
-	if r.node.queryService == nil {
-		errMsg := "null query service, collectionID = " + fmt.Sprintln(collectionID)
-		return errors.New(errMsg)
-	}
+	/*
+				collectionID := r.req.CollectionID
+				if r.node.queryService == nil {
+					errMsg := "null query service, collectionID = " + fmt.Sprintln(collectionID)
+					return errors.New(errMsg)
+				}
 
-	if r.node.queryService.hasQueryCollection(collectionID) {
-		log.Debug("queryCollection has been existed when addQueryChannel",
-			zap.Any("collectionID", collectionID),
-		)
-		return nil
-	}
+				if r.node.queryService.hasQueryCollection(collectionID) {
+					log.Debug("queryCollection has been existed when addQueryChannel",
+						zap.Any("collectionID", collectionID),
+					)
+					return nil
+				}
 
-	// add search collection
-	err := r.node.queryService.addQueryCollection(collectionID)
-	if err != nil {
-		return err
-	}
-	log.Debug("add query collection", zap.Any("collectionID", collectionID))
+				// add search collection
+				err := r.node.queryService.addQueryCollection(collectionID)
+				if err != nil {
+					return err
+				}
+				log.Debug("add query collection", zap.Any("collectionID", collectionID))
 
-	// add request channel
-	sc, err := r.node.queryService.getQueryCollection(collectionID)
-	if err != nil {
-		return err
-	}
-	consumeChannels := []string{r.req.QueryChannel}
-	consumeSubName := funcutil.GenChannelSubName(Params.CommonCfg.QueryNodeSubName, collectionID, Params.QueryNodeCfg.QueryNodeID)
+				// add request channel
+				sc, err := r.node.queryService.getQueryCollection(collectionID)
+				if err != nil {
+					return err
+				}
+			consumeChannels := []string{r.req.QueryChannel}
+			consumeSubName := funcutil.GenChannelSubName(Params.CommonCfg.QueryNodeSubName, collectionID, Params.QueryNodeCfg.QueryNodeID)
 
-	sc.queryMsgStream.AsConsumer(consumeChannels, consumeSubName)
-	metrics.QueryNodeNumConsumers.WithLabelValues(fmt.Sprint(Params.QueryNodeCfg.QueryNodeID)).Inc()
-	if r.req.SeekPosition == nil || len(r.req.SeekPosition.MsgID) == 0 {
-		// as consumer
-		log.Debug("QueryNode AsConsumer", zap.Strings("channels", consumeChannels), zap.String("sub name", consumeSubName))
-	} else {
-		// seek query channel
-		err = sc.queryMsgStream.Seek([]*internalpb.MsgPosition{r.req.SeekPosition})
-		if err != nil {
-			return err
+			sc.queryMsgStream.AsConsumer(consumeChannels, consumeSubName)
+			metrics.QueryNodeNumConsumers.WithLabelValues(fmt.Sprint(Params.QueryNodeCfg.QueryNodeID)).Inc()
+			if r.req.SeekPosition == nil || len(r.req.SeekPosition.MsgID) == 0 {
+				// as consumer
+				log.Debug("QueryNode AsConsumer", zap.Strings("channels", consumeChannels), zap.String("sub name", consumeSubName))
+			} else {
+				// seek query channel
+				err = sc.queryMsgStream.Seek([]*internalpb.MsgPosition{r.req.SeekPosition})
+				if err != nil {
+					return err
+				}
+				log.Debug("querynode seek query channel: ", zap.Any("consumeChannels", consumeChannels),
+					zap.String("seek position", string(r.req.SeekPosition.MsgID)))
+			}
+			log.Debug("QueryNode seek query channel: ", zap.Any("consumeChannels", consumeChannels),
+				zap.String("seek position", string(r.req.SeekPosition.MsgID)))
 		}
-		log.Debug("QueryNode seek query channel: ", zap.Any("consumeChannels", consumeChannels),
-			zap.String("seek position", string(r.req.SeekPosition.MsgID)))
-	}
 
-	// add result channel
-	// producerChannels := []string{r.req.QueryResultChannel}
-	// sc.queryResultMsgStream.AsProducer(producerChannels)
-	// log.Debug("QueryNode AsProducer", zap.Strings("channels", producerChannels))
+			// add result channel
+			// producerChannels := []string{r.req.QueryResultChannel}
+			// sc.queryResultMsgStream.AsProducer(producerChannels)
+			// log.Debug("QueryNode AsProducer", zap.Strings("channels", producerChannels))
 
-	// init global sealed segments
-	for _, segment := range r.req.GlobalSealedSegments {
-		sc.globalSegmentManager.addGlobalSegmentInfo(segment)
-	}
+			// init global sealed segments
+			for _, segment := range r.req.GlobalSealedSegments {
+				sc.globalSegmentManager.addGlobalSegmentInfo(segment)
+			}
 
-	// start queryCollection, message stream need to asConsumer before start
-	sc.start()
-	log.Debug("start query collection", zap.Any("collectionID", collectionID))
+			// start queryCollection, message stream need to asConsumer before start
+			sc.start()
+			log.Debug("start query collection", zap.Any("collectionID", collectionID))
 
-	log.Debug("addQueryChannelTask done",
-		zap.Any("collectionID", r.req.CollectionID),
-	)
+			log.Debug("addQueryChannelTask done",
+				zap.Any("collectionID", r.req.CollectionID),
+			)
+	*/
 	return nil
 }
 
@@ -458,17 +462,18 @@ func (w *watchDmChannelsTask) Execute(ctx context.Context) error {
 		w.node.tSafeReplica.addTSafe(channel)
 	}
 
-	// add tSafe watcher if queryCollection exists
-	qc, err := w.node.queryService.getQueryCollection(collectionID)
-	if err == nil {
-		for _, channel := range vChannels {
-			err = qc.addTSafeWatcher(channel)
-			if err != nil {
-				// tSafe have been exist, not error
-				log.Warn(err.Error())
+	/*
+		// add tSafe watcher if queryCollection exists
+		qc, err := w.node.queryService.getQueryCollection(collectionID)
+		if err == nil {
+			for _, channel := range vChannels {
+				err = qc.addTSafeWatcher(channel)
+				if err != nil {
+					// tSafe have been exist, not error
+					log.Warn(err.Error())
+				}
 			}
-		}
-	}
+		}*/
 
 	// start flow graphs
 	for _, fg := range channel2FlowGraph {
@@ -596,17 +601,18 @@ func (w *watchDeltaChannelsTask) Execute(ctx context.Context) error {
 		w.node.tSafeReplica.addTSafe(channel)
 	}
 
-	// add tSafe watcher if queryCollection exists
-	qc, err := w.node.queryService.getQueryCollection(collectionID)
-	if err == nil {
-		for _, channel := range vDeltaChannels {
-			err = qc.addTSafeWatcher(channel)
-			if err != nil {
-				// tSafe have been existed, not error
-				log.Warn(err.Error())
+	/*
+		// add tSafe watcher if queryCollection exists
+		qc, err := w.node.queryService.getQueryCollection(collectionID)
+		if err == nil {
+			for _, channel := range vDeltaChannels {
+				err = qc.addTSafeWatcher(channel)
+				if err != nil {
+					// tSafe have been existed, not error
+					log.Warn(err.Error())
+				}
 			}
-		}
-	}
+		}*/
 
 	// start flow graphs
 	for _, fg := range channel2FlowGraph {
@@ -717,11 +723,12 @@ func (r *releaseCollectionTask) Execute(ctx context.Context) error {
 		zap.Any("collectionID", r.req.CollectionID),
 	)
 
-	// remove query collection
-	// queryCollection and Collection would be deleted in releaseCollection,
-	// so we don't need to remove the tSafeWatcher or channel manually.
-	r.node.queryService.stopQueryCollection(r.req.CollectionID)
-
+	/*
+		// remove query collection
+		// queryCollection and Collection would be deleted in releaseCollection,
+		// so we don't need to remove the tSafeWatcher or channel manually.
+		r.node.queryService.stopQueryCollection(r.req.CollectionID)
+	*/
 	err := r.releaseReplica(r.node.streaming.replica, replicaStreaming)
 	if err != nil {
 		return fmt.Errorf("release collection failed, collectionID = %d, err = %s", r.req.CollectionID, err)

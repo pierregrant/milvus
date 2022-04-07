@@ -159,6 +159,7 @@ func (sc *ShardCluster) Close() {
 
 // addNode add a node into cluster
 func (sc *ShardCluster) addNode(evt nodeEvent) {
+	log.Debug("ShardCluster add node", zap.Int64("nodeID", evt.nodeID))
 	sc.mut.Lock()
 	defer sc.mut.Unlock()
 
@@ -202,6 +203,8 @@ func (sc *ShardCluster) removeNode(evt nodeEvent) {
 
 // updateSegment apply segment change to shard cluster
 func (sc *ShardCluster) updateSegment(evt segmentEvent) {
+
+	log.Debug("ShardCluster update segment", zap.Int64("nodeID", evt.nodeID), zap.Int64("segmentID", evt.segmentID), zap.Int32("state", int32(evt.state)))
 	sc.mut.Lock()
 	defer sc.mut.Unlock()
 
@@ -302,6 +305,7 @@ func (sc *ShardCluster) watchNodes(evtCh <-chan nodeEvent) {
 	for {
 		select {
 		case evt, ok := <-evtCh:
+			log.Debug("node event", zap.Any("evt", evt))
 			if !ok {
 				log.Warn("ShardCluster node channel closed", zap.Int64("collectionID", sc.collectionID), zap.Int64("replicaID", sc.replicaID))
 				return
@@ -324,6 +328,7 @@ func (sc *ShardCluster) watchSegments(evtCh <-chan segmentEvent) {
 	for {
 		select {
 		case evt, ok := <-evtCh:
+			log.Debug("segment event", zap.Any("evt", evt))
 			if !ok {
 				log.Warn("ShardCluster segment channel closed", zap.Int64("collectionID", sc.collectionID), zap.Int64("replicaID", sc.replicaID))
 				return
@@ -396,6 +401,10 @@ func (sc *ShardCluster) Search(ctx context.Context, req *querypb.SearchRequest) 
 	// get node allocation
 	segAllocs := sc.segmentAllocations()
 
+	log.Debug("cluster segment distribution", zap.Int("len", len(segAllocs)))
+	for nodeID, segmentIDs := range segAllocs {
+		log.Debug("segments distribution", zap.Int64("nodeID", nodeID), zap.Int64s("segments", segmentIDs))
+	}
 	// TODO dispatch to local queryShardService query dml channel growing segments
 
 	// concurrent visiting nodes

@@ -79,6 +79,7 @@ const (
 	defaultCollectionID = UniqueID(0)
 	defaultPartitionID  = UniqueID(1)
 	defaultSegmentID    = UniqueID(2)
+	defaultReplicaID    = UniqueID(10)
 
 	defaultCollectionName = "query-node-unittest-default-collection"
 	defaultPartitionName  = "query-node-unittest-default-partition"
@@ -1757,9 +1758,13 @@ func genSimpleQueryNodeWithMQFactory(ctx context.Context, fac dependency.Factory
 	if err != nil {
 		return nil, err
 	}
-	qs := newQueryService(ctx, node.historical, node.streaming, vectorStorage, cacheStorage, fac)
-	defer qs.close()
-	node.queryService = qs
+	/*
+		qs := newQueryService(ctx, node.historical, node.streaming, vectorStorage, cacheStorage, fac)
+		defer qs.close()
+		node.queryService = qs
+			qs := newQueryService(ctx, node.historical, node.streaming, node.msFactory)
+			defer qs.close()
+			node.queryService = qs*/
 
 	// init shard cluster service
 	node.ShardClusterService = newShardClusterService(node.etcdCli, node.session)
