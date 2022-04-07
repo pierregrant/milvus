@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -45,7 +44,6 @@ type searchTaskV2 struct {
 
 	resultBuf          chan *internalpb.SearchResults
 	toReduceResults    []*internalpb.SearchResults
-	toReduceResultsMu  sync.RWMutex
 	runningGroup       *errgroup.Group
 	runningGroupCtx    context.Context
 	getQueryNodePolicy func(context.Context, string) (types.QueryNode, error)
@@ -311,13 +309,13 @@ func (t *searchTaskV2) PostExecute(ctx context.Context) error {
 			case <-t.TraceCtx().Done():
 				log.Debug("wait to finish timeout!", zap.Int64("taskID", t.ID()))
 				return
-			case res := <-t.resultBuf:
-				log.Debug("receive search results", zap.Int64("sourceID", res.GetBase().GetSourceID()), zap.Any("taskID", t.ID()))
-				t.toReduceResultsMu.Lock()
-				t.toReduceResults = append(t.toReduceResults, res)
-				t.toReduceResultsMu.Unlock()
 			case <-t.runningGroupCtx.Done():
 				log.Debug("all searches are finished or canceled", zap.Any("taskID", t.ID()))
+				close(t.resultBuf)
+				for res := range t.resultBuf {
+					t.toReduceResults = append(t.toReduceResults, res)
+					log.Debug("proxy receives one query result", zap.Int64("sourceID", res.GetBase().GetSourceID()), zap.Any("taskID", t.ID()))
+				}
 				return
 			}
 		}

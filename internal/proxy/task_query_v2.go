@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -40,7 +39,6 @@ type queryTaskV2 struct {
 
 	resultBuf          chan *internalpb.RetrieveResults
 	toReduceResults    []*internalpb.RetrieveResults
-	toReduceResultsMu  sync.RWMutex
 	runningGroup       *errgroup.Group
 	runningGroupCtx    context.Context
 	getQueryNodePolicy func(context.Context, string) (types.QueryNode, error)
@@ -276,22 +274,19 @@ func (t *queryTaskV2) PostExecute(ctx context.Context) error {
 		tr.Elapse("done")
 	}()
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
 	go func() {
 		for {
 			select {
 			case <-t.TraceCtx().Done():
 				log.Warn("proxy", zap.Int64("Query: wait to finish failed, timeout!, taskID:", t.ID()))
 				return
-			case res := <-t.resultBuf:
-				log.Debug("proxy receives one query result", zap.Any("taskID", t.ID()))
-				t.toReduceResultsMu.Lock()
-				t.toReduceResults = append(t.toReduceResults, res)
-				t.toReduceResultsMu.Unlock()
 			case <-t.runningGroupCtx.Done():
 				log.Debug("all queries are finished or canceled", zap.Any("taskID", t.ID()))
-				wg.Done()
+				close(t.resultBuf)
+				for res := range t.resultBuf {
+					t.toReduceResults = append(t.toReduceResults, res)
+					log.Debug("proxy receives one query result", zap.Int64("sourceID", res.GetBase().GetSourceID()), zap.Any("taskID", t.ID()))
+				}
 				return
 			}
 		}
@@ -302,7 +297,6 @@ func (t *queryTaskV2) PostExecute(ctx context.Context) error {
 		return err
 	}
 
-	wg.Wait()
 	t.result, err = mergeRetrieveResults(t.toReduceResults)
 	if err != nil {
 		return err
@@ -358,6 +352,7 @@ func (t *queryTaskV2) queryShard(ctx context.Context, leaders *querypb.ShardLead
 			return fmt.Errorf("fail to Query, QueryNode ID = %d, reason=%s", nodeID, result.GetStatus().GetReason())
 		}
 
+		log.Debug("get query result", zap.Int64("nodeID", nodeID), zap.String("channelID", leaders.GetChannelName()))
 		t.resultBuf <- result
 		return nil
 	}
