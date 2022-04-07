@@ -471,6 +471,7 @@ func (lct *loadCollectionTask) execute(ctx context.Context) error {
 					CollectionID: collectionID,
 					PartitionIDs: partitionIds,
 				},
+				ReplicaID: replica.ReplicaID,
 			}
 
 			loadSegmentReqs = append(loadSegmentReqs, loadSegmentReq)
@@ -902,6 +903,7 @@ func (lpt *loadPartitionTask) execute(ctx context.Context) error {
 					CollectionID: collectionID,
 					PartitionIDs: partitionIDs,
 				},
+				ReplicaID: replica.ReplicaID,
 			}
 			loadSegmentReqs = append(loadSegmentReqs, loadSegmentReq)
 		}
