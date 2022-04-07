@@ -341,7 +341,7 @@ func (t *searchTaskV2) PostExecute(ctx context.Context) error {
 
 		t.result = &milvuspb.SearchResults{
 			Status: &commonpb.Status{
-				ErrorCode: commonpb.ErrorCode_UnexpectedError,
+				ErrorCode: commonpb.ErrorCode_Success,
 				Reason:    "search result is empty",
 			},
 			CollectionName: t.collectionName,
