@@ -217,7 +217,7 @@ func (q *queryShard) search(ctx context.Context, req *querypb.SearchRequest) (*i
 		if err != nil {
 			return nil, err
 		}
-		return encodeSearchResultData(reducedResultData)
+		return encodeSearchResultData(reducedResultData, queryNum, plan.getTopK(), plan.getMetricType())
 	}
 
 	// search each segments by segment IDs in request
@@ -401,11 +401,14 @@ func decodeSearchResults(searchResults []*internalpb.SearchResults) ([]*schemapb
 	return results, nil
 }
 
-func encodeSearchResultData(searchResultData *schemapb.SearchResultData) (searchResults *internalpb.SearchResults, err error) {
+func encodeSearchResultData(searchResultData *schemapb.SearchResultData, nq int64, topk int64, metricType string) (searchResults *internalpb.SearchResults, err error) {
 	searchResults = &internalpb.SearchResults{
 		Status: &commonpb.Status{
 			ErrorCode: commonpb.ErrorCode_Success,
 		},
+		NumQueries: nq,
+		TopK:       topk,
+		MetricType: metricType,
 	}
 	searchResults.SlicedBlob, err = proto.Marshal(searchResultData)
 	if err != nil {
