@@ -4,12 +4,18 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"strconv"
 	"sync"
 
 	grpcquerynodeclient "github.com/milvus-io/milvus/internal/distributed/querynode/client"
+	"github.com/milvus-io/milvus/internal/util"
 	"github.com/milvus-io/milvus/internal/util/sessionutil"
 	"github.com/milvus-io/milvus/internal/util/typeutil"
 	clientv3 "go.etcd.io/etcd/client/v3"
+)
+
+const (
+	ReplicaMetaPrefix = "queryCoord-ReplicaMeta"
 )
 
 // ShardClusterService maintains the online ShardCluster(leader) in this querynode.
@@ -31,8 +37,7 @@ func newShardClusterService(client *clientv3.Client, session *sessionutil.Sessio
 
 // addShardCluster adds shardCluster into service.
 func (s *ShardClusterService) addShardCluster(collectionID, replicaID int64, vchannelName string) {
-	// FIXME: path is hard code for dummy here, use correct or configured path before merge
-	nodeDetector := NewEtcdShardNodeDetector(s.client, path.Join(Params.EtcdCfg.KvRootPath, "replicas"),
+	nodeDetector := NewEtcdShardNodeDetector(s.client, path.Join(Params.EtcdCfg.KvRootPath, ReplicaMetaPrefix),
 		func() (map[int64]string, error) {
 			result := make(map[int64]string)
 			sessions, _, err := s.session.GetSessions(typeutil.QueryNodeRole)
@@ -45,8 +50,7 @@ func (s *ShardClusterService) addShardCluster(collectionID, replicaID int64, vch
 			return result, nil
 		})
 
-	//FIXME: path is hard code for dummy here, use correct or configured path before merge
-	segmentDetector := NewEtcdShardSegmentDetector(s.client, path.Join(Params.EtcdCfg.KvRootPath, "segments"))
+	segmentDetector := NewEtcdShardSegmentDetector(s.client, path.Join(Params.EtcdCfg.KvRootPath, util.SegmentMetaPrefix, strconv.FormatInt(collectionID, 10)))
 
 	cs := NewShardCluster(collectionID, replicaID, vchannelName, nodeDetector, segmentDetector,
 		func(nodeID int64, addr string) shardQueryNode {
