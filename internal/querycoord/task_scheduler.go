@@ -922,6 +922,7 @@ func updateSegmentInfoFromTask(ctx context.Context, triggerTask task, meta Meta)
 							CollectionID:   loadInfo.CollectionID,
 							PartitionID:    loadInfo.PartitionID,
 							NodeID:         dstNodeID,
+							DmChannel:      loadInfo.InsertChannel,
 							SegmentState:   commonpb.SegmentState_Sealed,
 							CompactionFrom: loadInfo.CompactionFrom,
 							ReplicaIds:     []UniqueID{req.ReplicaID},
