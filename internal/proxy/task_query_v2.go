@@ -338,7 +338,6 @@ func (t *queryTaskV2) PostExecute(ctx context.Context) error {
 
 func (t *queryTaskV2) queryShard(ctx context.Context, leaders *querypb.ShardLeadersList) error {
 	query := func(nodeID UniqueID, qn types.QueryNode) error {
-
 		req := &querypb.QueryRequest{
 			Req:        t.RetrieveRequest,
 			DmlChannel: leaders.GetChannelName(),
@@ -346,10 +345,14 @@ func (t *queryTaskV2) queryShard(ctx context.Context, leaders *querypb.ShardLead
 
 		result, err := qn.Query(ctx, req)
 		if err != nil {
-			return err
+			log.Warn("QueryNode query returns error", zap.Int64("nodeID", nodeID),
+				zap.Error(err))
+			return fmt.Errorf("fail to Query, QueryNodeID=%d, err=%s", nodeID, err.Error())
 		}
-		if result.Status.ErrorCode != commonpb.ErrorCode_Success {
-			return fmt.Errorf("fail to Query, QueryNode ID = %d, reason=%s", nodeID, result.Status.Reason)
+		if result.GetStatus().GetErrorCode() != commonpb.ErrorCode_Success {
+			log.Warn("QueryNode query result error", zap.Int64("nodeID", nodeID),
+				zap.String("reason", result.GetStatus().GetReason()))
+			return fmt.Errorf("fail to Query, QueryNode ID = %d, reason=%s", nodeID, result.GetStatus().GetReason())
 		}
 
 		t.resultBuf <- result
