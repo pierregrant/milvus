@@ -267,8 +267,8 @@ func (t *searchTaskV2) Execute(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if resp.Status.ErrorCode != commonpb.ErrorCode_Success {
-		return fmt.Errorf("fail to get shard leaders from QueryCoord: %s", resp.Status.Reason)
+	if resp.GetStatus().GetErrorCode() != commonpb.ErrorCode_Success {
+		return fmt.Errorf("fail to get shard leaders from QueryCoord: %s", resp.GetStatus().GetReason())
 	}
 
 	shards := resp.GetShards()
@@ -310,11 +310,10 @@ func (t *searchTaskV2) PostExecute(ctx context.Context) error {
 		for {
 			select {
 			case <-t.TraceCtx().Done():
-				log.Debug("proxy", zap.Int64("Query: wait to finish failed, timeout!, taskID:", t.ID()))
-				// return fmt.Errorf("queryTask:wait to finish failed, timeout : %d", t.ID())
+				log.Debug("wait to finish timeout!", zap.Int64("taskID", t.ID()))
 				return
 			case res := <-t.resultBuf:
-				log.Debug("receive search results", zap.Any("taskID", t.ID()))
+				log.Debug("receive search results", zap.Int64("sourceID", res.GetBase().GetSourceID()), zap.Any("taskID", t.ID()))
 				t.toReduceResultsMu.Lock()
 				t.toReduceResults = append(t.toReduceResults, res)
 				t.toReduceResultsMu.Unlock()
@@ -391,12 +390,14 @@ func (t *searchTaskV2) searchShard(ctx context.Context, leaders *querypb.ShardLe
 
 		result, err := qn.Search(ctx, req)
 		if err != nil {
-			log.Warn("SearchTaskV2 search search return error", zap.Error(err))
-			return err
+			log.Warn("QueryNode search returns error", zap.Int64("nodeID", nodeID),
+				zap.Error(err))
+			return fmt.Errorf("fail to Search, QueryNodeID=%d, err=%s", nodeID, err.Error())
 		}
 		if result.GetStatus().GetErrorCode() != commonpb.ErrorCode_Success {
-			log.Warn("SearchTaskV2 search result with error", zap.String("reason", result.GetStatus().GetReason()))
-			return fmt.Errorf("fail to Search, QueryNode ID = %d, reason=%s", nodeID, result.Status.Reason)
+			log.Warn("QueryNode search result error", zap.Int64("nodeID", nodeID),
+				zap.String("reason", result.GetStatus().GetReason()))
+			return fmt.Errorf("fail to Search, QueryNode ID=%d, reason=%s", nodeID, result.GetStatus().GetReason())
 		}
 
 		t.resultBuf <- result
@@ -423,7 +424,7 @@ func (t *searchTaskV2) RoundRobin(query func(UniqueID, types.QueryNode) error, l
 	for err != nil && current < replicaNum {
 		currentID := leaders.GetNodeIds()[current]
 		if err != errBegin {
-			log.Warn("fail to Search with shard leader", zap.String("leader", leaders.GetChannelName()), zap.Int64("nodeID", currentID))
+			log.Warn("retry with another QueryNode", zap.String("leader", leaders.GetChannelName()), zap.Int64("nodeID", currentID))
 		}
 
 		qn, err = t.getQueryNodePolicy(t.TraceCtx(), leaders.GetNodeAddrs()[current])
@@ -432,10 +433,11 @@ func (t *searchTaskV2) RoundRobin(query func(UniqueID, types.QueryNode) error, l
 			current++
 			continue
 		}
+
 		defer qn.Stop()
 		err = query(currentID, qn)
 		if err != nil {
-			log.Warn("fail to Search with shard leader",
+			log.Warn("fail to search with shard leader",
 				zap.String("leader", leaders.GetChannelName()),
 				zap.Int64("nodeID", currentID),
 				zap.Error(err))
@@ -509,11 +511,15 @@ func checkSearchResultData(data *schemapb.SearchResultData, nq int64, topk int64
 	if data.TopK != topk {
 		return fmt.Errorf("search result's topk(%d) mis-match with %d", data.TopK, topk)
 	}
-	if len(data.Ids.GetIntId().Data) != (int)(nq*topk) {
-		return fmt.Errorf("search result's id length %d invalid", len(data.Ids.GetIntId().Data))
+
+	expectedLength := (int)(nq * topk)
+	if len(data.Ids.GetIntId().Data) != expectedLength {
+		return fmt.Errorf("search result's ID length invalid, ID length=%d, expectd length=%d",
+			len(data.Ids.GetIntId().Data), expectedLength)
 	}
-	if len(data.Scores) != (int)(nq*topk) {
-		return fmt.Errorf("search result's score length %d invalid", len(data.Scores))
+	if len(data.Scores) != expectedLength {
+		return fmt.Errorf("search result's score length invalid, score length=%d, expectedLength=%d",
+			len(data.Scores), expectedLength)
 	}
 	return nil
 }
@@ -570,11 +576,12 @@ func reduceSearchResultData(searchResultData []*schemapb.SearchResultData, nq in
 
 	for i, sData := range searchResultData {
 		log.Debug("reduceSearchResultData",
-			zap.Int("i", i),
+			zap.Int("result No.", i),
 			zap.Int64("nq", sData.NumQueries),
 			zap.Int64("topk", sData.TopK),
 			zap.Any("len(FieldsData)", len(sData.FieldsData)))
 		if err := checkSearchResultData(sData, nq, topk); err != nil {
+			log.Warn("invalid search results", zap.Error(err))
 			return ret, err
 		}
 		//printSearchResultData(sData, strconv.FormatInt(int64(i), 10))
