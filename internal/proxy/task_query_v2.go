@@ -418,7 +418,7 @@ func (t *queryTaskV2) RoundRobin(query func(UniqueID, types.QueryNode) error, le
 		current++
 	}
 
-	if current == replicaNum {
+	if current == replicaNum && err != nil {
 		return fmt.Errorf("no shard leaders available for channel: %s, leaders: %v", leaders.GetChannelName(), leaders.GetNodeIds())
 	}
 	return nil

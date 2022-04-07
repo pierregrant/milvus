@@ -391,9 +391,11 @@ func (t *searchTaskV2) searchShard(ctx context.Context, leaders *querypb.ShardLe
 
 		result, err := qn.Search(ctx, req)
 		if err != nil {
+			log.Warn("SearchTaskV2 search search return error", zap.Error(err))
 			return err
 		}
 		if result.GetStatus().GetErrorCode() != commonpb.ErrorCode_Success {
+			log.Warn("SearchTaskV2 search result with error", zap.String("reason", result.GetStatus().GetReason()))
 			return fmt.Errorf("fail to Search, QueryNode ID = %d, reason=%s", nodeID, result.Status.Reason)
 		}
 
@@ -441,7 +443,7 @@ func (t *searchTaskV2) RoundRobin(query func(UniqueID, types.QueryNode) error, l
 		current++
 	}
 
-	if current == replicaNum {
+	if current == replicaNum && err != nil {
 		return fmt.Errorf("no shard leaders available for channel: %s, leaders: %v", leaders.GetChannelName(), leaders.GetNodeIds())
 	}
 	return nil
