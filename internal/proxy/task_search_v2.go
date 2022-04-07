@@ -202,7 +202,6 @@ func (t *searchTaskV2) PreExecute(ctx context.Context) error {
 		t.SearchRequest.TimeoutTimestamp = tsoutil.ComposeTSByTime(deadline, 0)
 	}
 
-	t.ResultChannelID = Params.ProxyCfg.SearchResultChannelNames[0]
 	t.DbID = 0 // todo
 	t.CollectionID = collID
 	t.PartitionIDs = make([]UniqueID, 0)
