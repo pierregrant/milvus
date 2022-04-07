@@ -584,7 +584,15 @@ func TestImpl_Search(t *testing.T) {
 	node, err := genSimpleQueryNode(ctx)
 	require.NoError(t, err)
 
-	_, err = node.Search(ctx, nil)
+	req, err := genSimpleSearchRequest(IndexFaissIDMap)
+	require.NoError(t, err)
+
+	node.queryShardService.addQueryShard(defaultCollectionID, defaultDMLChannel, defaultReplicaID)
+
+	_, err = node.Search(ctx, &queryPb.SearchRequest{
+		Req:        req,
+		DmlChannel: defaultDMLChannel,
+	})
 	assert.NoError(t, err)
 }
 
@@ -595,6 +603,14 @@ func TestImpl_Query(t *testing.T) {
 	node, err := genSimpleQueryNode(ctx)
 	require.NoError(t, err)
 
-	_, err = node.Query(ctx, nil)
+	req, err := genSimpleRetrieveRequest()
+	require.NoError(t, err)
+
+	node.queryShardService.addQueryShard(defaultCollectionID, defaultDMLChannel, defaultReplicaID)
+
+	_, err = node.Query(ctx, &queryPb.QueryRequest{
+		Req:        req,
+		DmlChannel: defaultDMLChannel,
+	})
 	assert.NoError(t, err)
 }

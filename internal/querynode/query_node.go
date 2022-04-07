@@ -100,7 +100,7 @@ type QueryNode struct {
 	dataSyncService *dataSyncService
 
 	// internal services
-	queryService *queryService
+	//queryService *queryService
 	statsService *statsService
 
 	// segment loader
@@ -131,8 +131,8 @@ func NewQueryNode(ctx context.Context, factory msgstream.Factory) *QueryNode {
 	node := &QueryNode{
 		queryNodeLoopCtx:    ctx1,
 		queryNodeLoopCancel: cancel,
-		queryService:        nil,
-		msFactory:           factory,
+		//queryService:        nil,
+		msFactory: factory,
 	}
 
 	node.scheduler = newTaskScheduler(ctx1)
@@ -344,11 +344,12 @@ func (node *QueryNode) Start() error {
 
 	// init services and manager
 	// TODO: pass node.streaming.replica to search service
-	node.queryService = newQueryService(node.queryNodeLoopCtx,
-		node.historical,
-		node.streaming,
-		node.msFactory,
-		qsOptWithSessionManager(node.sessionManager))
+	/*
+		node.queryService = newQueryService(node.queryNodeLoopCtx,
+			node.historical,
+			node.streaming,
+			node.msFactory,
+			qsOptWithSessionManager(node.sessionManager))*/
 
 	// start task scheduler
 	go node.scheduler.Start()
@@ -397,8 +398,13 @@ func (node *QueryNode) Stop() error {
 	if node.streaming != nil {
 		node.streaming.close()
 	}
-	if node.queryService != nil {
-		node.queryService.close()
+	/*
+		if node.queryService != nil {
+			node.queryService.close()
+		}*/
+
+	if node.queryShardService != nil {
+		node.queryShardService.close()
 	}
 	//if node.statsService != nil {
 	//	node.statsService.close()
@@ -460,43 +466,44 @@ func (node *QueryNode) watchChangeInfo() {
 
 func (node *QueryNode) waitChangeInfo(segmentChangeInfos *querypb.SealedSegmentsChangeInfo) error {
 	fn := func() error {
-		for _, info := range segmentChangeInfos.Infos {
-			canDoLoadBalance := true
-			// make sure all query channel already received segment location changes
-			// Check online segments:
-			for _, segmentInfo := range info.OnlineSegments {
-				if node.queryService.hasQueryCollection(segmentInfo.CollectionID) {
-					qc, err := node.queryService.getQueryCollection(segmentInfo.CollectionID)
-					if err != nil {
-						canDoLoadBalance = false
-						break
-					}
-					if info.OnlineNodeID == Params.QueryNodeCfg.QueryNodeID && !qc.globalSegmentManager.hasGlobalSealedSegment(segmentInfo.SegmentID) {
-						canDoLoadBalance = false
-						break
-					}
-				}
-			}
-			// Check offline segments:
-			for _, segmentInfo := range info.OfflineSegments {
-				if node.queryService.hasQueryCollection(segmentInfo.CollectionID) {
-					qc, err := node.queryService.getQueryCollection(segmentInfo.CollectionID)
-					if err != nil {
-						canDoLoadBalance = false
-						break
-					}
-					if info.OfflineNodeID == Params.QueryNodeCfg.QueryNodeID && qc.globalSegmentManager.hasGlobalSealedSegment(segmentInfo.SegmentID) {
-						canDoLoadBalance = false
-						break
+		/*
+			for _, info := range segmentChangeInfos.Infos {
+				canDoLoadBalance := true
+				// make sure all query channel already received segment location changes
+				// Check online segments:
+				for _, segmentInfo := range info.OnlineSegments {
+					if node.queryService.hasQueryCollection(segmentInfo.CollectionID) {
+						qc, err := node.queryService.getQueryCollection(segmentInfo.CollectionID)
+						if err != nil {
+							canDoLoadBalance = false
+							break
+						}
+						if info.OnlineNodeID == Params.QueryNodeCfg.QueryNodeID && !qc.globalSegmentManager.hasGlobalSealedSegment(segmentInfo.SegmentID) {
+							canDoLoadBalance = false
+							break
+						}
 					}
 				}
+				// Check offline segments:
+				for _, segmentInfo := range info.OfflineSegments {
+					if node.queryService.hasQueryCollection(segmentInfo.CollectionID) {
+						qc, err := node.queryService.getQueryCollection(segmentInfo.CollectionID)
+						if err != nil {
+							canDoLoadBalance = false
+							break
+						}
+						if info.OfflineNodeID == Params.QueryNodeCfg.QueryNodeID && qc.globalSegmentManager.hasGlobalSealedSegment(segmentInfo.SegmentID) {
+							canDoLoadBalance = false
+							break
+						}
+					}
+				}
+				if canDoLoadBalance {
+					return nil
+				}
+				return errors.New(fmt.Sprintln("waitChangeInfo failed, infoID = ", segmentChangeInfos.Base.GetMsgID()))
 			}
-			if canDoLoadBalance {
-				return nil
-			}
-			return errors.New(fmt.Sprintln("waitChangeInfo failed, infoID = ", segmentChangeInfos.Base.GetMsgID()))
-		}
-
+		*/
 		return nil
 	}
 
