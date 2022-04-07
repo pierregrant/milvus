@@ -492,6 +492,7 @@ func (lct *loadCollectionTask) execute(ctx context.Context) error {
 					CollectionID: collectionID,
 					PartitionIDs: partitionIds,
 				},
+				ReplicaID: replica.GetReplicaID(),
 			}
 
 			watchDmChannelReqs = append(watchDmChannelReqs, watchRequest)
@@ -919,6 +920,7 @@ func (lpt *loadPartitionTask) execute(ctx context.Context) error {
 					CollectionID: collectionID,
 					PartitionIDs: partitionIDs,
 				},
+				ReplicaID: replica.GetReplicaID(),
 			}
 
 			watchDmChannelReqs = append(watchDmChannelReqs, watchRequest)
@@ -1426,6 +1428,7 @@ func (wdt *watchDmChannelTask) reschedule(ctx context.Context) ([]task, error) {
 				CollectionID: collectionID,
 				PartitionIDs: wdt.GetLoadMeta().GetPartitionIDs(),
 			},
+			ReplicaID: wdt.GetReplicaID(),
 		}
 		watchDmChannelReqs = append(watchDmChannelReqs, req)
 	}
