@@ -67,6 +67,7 @@ func (t *searchTaskV2) PreExecute(ctx context.Context) error {
 	}
 	t.CollectionID = collID
 	t.collectionName = collectionName
+	t.PartitionIDs = make([]UniqueID, 0)
 
 	for _, tag := range t.request.PartitionNames {
 		if err := validatePartitionTag(tag, false); err != nil {
@@ -74,9 +75,36 @@ func (t *searchTaskV2) PreExecute(ctx context.Context) error {
 		}
 	}
 
-	// check if collection was already loaded into query node
-	if !t.checkIfLoaded(collID) {
-		return fmt.Errorf("collection %v was not loaded into memory", collectionName)
+	partitionsMap, err := globalMetaCache.GetPartitions(ctx, collectionName)
+	if err != nil {
+		return err
+	}
+
+	partitionsRecord := make(map[UniqueID]bool)
+	for _, partitionName := range t.request.PartitionNames {
+		pattern := fmt.Sprintf("^%s$", partitionName)
+		re, err := regexp.Compile(pattern)
+		if err != nil {
+			return errors.New("invalid partition names")
+		}
+		found := false
+		for name, pID := range partitionsMap {
+			if re.MatchString(name) {
+				if _, exist := partitionsRecord[pID]; !exist {
+					t.PartitionIDs = append(t.PartitionIDs, pID)
+					partitionsRecord[pID] = true
+				}
+				found = true
+			}
+		}
+		if !found {
+			return fmt.Errorf("partition name %s not found", partitionName)
+		}
+	}
+
+	// check if collection/partitions are  loaded into query node
+	if !t.checkIfLoaded(collID, t.PartitionIDs) {
+		return fmt.Errorf("collection:%v or partitions:%v not loaded into memory", collectionName, t.request.GetPartitionNames())
 	}
 
 	// TODO(dragondriver): necessary to check if partition was loaded into query node?
@@ -202,37 +230,6 @@ func (t *searchTaskV2) PreExecute(ctx context.Context) error {
 	}
 
 	t.DbID = 0 // todo
-	t.CollectionID = collID
-	t.PartitionIDs = make([]UniqueID, 0)
-
-	partitionsMap, err := globalMetaCache.GetPartitions(ctx, collectionName)
-	if err != nil {
-		return err
-	}
-
-	partitionsRecord := make(map[UniqueID]bool)
-	for _, partitionName := range t.request.PartitionNames {
-		pattern := fmt.Sprintf("^%s$", partitionName)
-		re, err := regexp.Compile(pattern)
-		if err != nil {
-			return errors.New("invalid partition names")
-		}
-		found := false
-		for name, pID := range partitionsMap {
-			if re.MatchString(name) {
-				if _, exist := partitionsRecord[pID]; !exist {
-					t.PartitionIDs = append(t.PartitionIDs, pID)
-					partitionsRecord[pID] = true
-				}
-				found = true
-			}
-		}
-		if !found {
-			errMsg := fmt.Sprintf("PartitonName: %s not found", partitionName)
-			return errors.New(errMsg)
-		}
-	}
-
 	t.SearchRequest.Dsl = t.request.Dsl
 	t.SearchRequest.PlaceholderGroup = t.request.PlaceholderGroup
 
@@ -449,8 +446,7 @@ func (t *searchTaskV2) RoundRobin(query func(UniqueID, types.QueryNode) error, l
 	return nil
 }
 
-func (t *searchTaskV2) checkIfLoaded(collectionID UniqueID) bool {
-
+func (t *searchTaskV2) checkIfLoaded(collectionID UniqueID, partitionIDs []UniqueID) bool {
 	resp, err := t.qc.ShowCollections(t.ctx, &querypb.ShowCollectionsRequest{
 		Base: &commonpb.MsgBase{
 			MsgType:   commonpb.MsgType_ShowCollections,
@@ -473,13 +469,68 @@ func (t *searchTaskV2) checkIfLoaded(collectionID UniqueID) bool {
 		return false
 	}
 
+	loaded := false
 	for index, collID := range resp.CollectionIDs {
 		if collID == collectionID && resp.GetInMemoryPercentages()[index] >= int64(100) {
-			return true
+			loaded = true
+			break
 		}
 	}
 
-	return false
+	if !loaded && len(partitionIDs) > 0 {
+		resp, err := t.qc.ShowPartitions(t.ctx, &querypb.ShowPartitionsRequest{
+			Base: &commonpb.MsgBase{
+				MsgType:   commonpb.MsgType_ShowCollections,
+				MsgID:     t.Base.MsgID,
+				Timestamp: t.Base.Timestamp,
+				SourceID:  Params.ProxyCfg.ProxyID,
+			},
+			CollectionID: collectionID,
+			PartitionIDs: partitionIDs,
+		})
+		if err != nil {
+			log.Warn("fail to show partitions by QueryCoord",
+				zap.Int64("requestID", t.Base.MsgID),
+				zap.Int64("collectionID", collectionID),
+				zap.Int64s("partitionIDs", partitionIDs),
+				zap.String("requestType", "search"),
+				zap.Error(err))
+			return false
+		}
+
+		if resp.Status.ErrorCode != commonpb.ErrorCode_Success {
+			log.Warn("fail to show partitions by QueryCoord",
+				zap.Int64("collectionID", collectionID),
+				zap.Int64s("partitionIDs", partitionIDs),
+				zap.Int64("requestID", t.Base.MsgID), zap.String("requestType", "search"),
+				zap.String("reason", resp.GetStatus().GetReason()))
+			return false
+		}
+		// Current logic: show partitions won't return error if the given partitions are all loaded
+		return true
+
+		// getIndex := func(target UniqueID, partitionIDs []UniqueID) int {
+		//     for index, pID := range partitionIDs {
+		//         if target == pID {
+		//             return index
+		//         }
+		//     }
+		//     return -1
+		// }
+		//
+		// for _, pID := range partitionIDs {
+		//     i := getIndex(pID, resp.GetPartitionIDs())
+		//     if i == -1 {
+		//         return false
+		//     }
+		//
+		//     if resp.GetInMemoryPercentages()[i] < 100 {
+		//         return false
+		//     }
+		// }
+		// return true
+	}
+	return loaded
 }
 
 func decodeSearchResults(searchResults []*internalpb.SearchResults) ([]*schemapb.SearchResultData, error) {
