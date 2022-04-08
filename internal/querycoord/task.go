@@ -1264,7 +1264,7 @@ func (lst *loadSegmentTask) reschedule(ctx context.Context) ([]task, error) {
 	if lst.getParentTask().getTriggerCondition() == querypb.TriggerCondition_NodeDown {
 		wait2AssignTaskSuccess = true
 	}
-	reScheduledTasks, err := assignInternalTask(ctx, lst.getParentTask(), lst.meta, lst.cluster, loadSegmentReqs, nil, wait2AssignTaskSuccess, lst.excludeNodeIDs, nil, -1)
+	reScheduledTasks, err := assignInternalTask(ctx, lst.getParentTask(), lst.meta, lst.cluster, loadSegmentReqs, nil, wait2AssignTaskSuccess, lst.excludeNodeIDs, nil, lst.ReplicaID)
 	if err != nil {
 		log.Error("loadSegment reschedule failed", zap.Int64s("excludeNodes", lst.excludeNodeIDs), zap.Int64("taskID", lst.getTaskID()), zap.Error(err))
 		return nil, err
@@ -1444,7 +1444,7 @@ func (wdt *watchDmChannelTask) reschedule(ctx context.Context) ([]task, error) {
 	if wdt.getParentTask().getTriggerCondition() == querypb.TriggerCondition_NodeDown {
 		wait2AssignTaskSuccess = true
 	}
-	reScheduledTasks, err := assignInternalTask(ctx, wdt.parentTask, wdt.meta, wdt.cluster, nil, watchDmChannelReqs, wait2AssignTaskSuccess, wdt.excludeNodeIDs, nil, -1)
+	reScheduledTasks, err := assignInternalTask(ctx, wdt.parentTask, wdt.meta, wdt.cluster, nil, watchDmChannelReqs, wait2AssignTaskSuccess, wdt.excludeNodeIDs, nil, wdt.ReplicaID)
 	if err != nil {
 		log.Error("watchDmChannel reschedule failed", zap.Int64("taskID", wdt.getTaskID()), zap.Int64s("excludeNodes", wdt.excludeNodeIDs), zap.Error(err))
 		return nil, err
@@ -1972,7 +1972,6 @@ func (lbt *loadBalanceTask) execute(ctx context.Context) error {
 								},
 								ReplicaID: replica.ReplicaID,
 							}
-
 							loadSegmentReqs = append(loadSegmentReqs, loadSegmentReq)
 						}
 					}
@@ -2000,7 +1999,7 @@ func (lbt *loadBalanceTask) execute(ctx context.Context) error {
 
 				mergedDmChannel := mergeDmChannelInfo(dmChannelInfos)
 				for channelName, vChannelInfo := range mergedDmChannel {
-					if _, ok := dmChannel2WatchInfo[channelName]; ok {
+					if info, ok := dmChannel2WatchInfo[channelName]; ok {
 						msgBase := proto.Clone(lbt.Base).(*commonpb.MsgBase)
 						msgBase.MsgType = commonpb.MsgType_WatchDmChannels
 						watchRequest := &querypb.WatchDmChannelsRequest{
@@ -2013,7 +2012,7 @@ func (lbt *loadBalanceTask) execute(ctx context.Context) error {
 								CollectionID: collectionID,
 								PartitionIDs: toRecoverPartitionIDs,
 							},
-							ReplicaID: replica.ReplicaID,
+							ReplicaID: info.ReplicaID,
 						}
 
 						if collectionInfo.LoadType == querypb.LoadType_LoadPartition {
