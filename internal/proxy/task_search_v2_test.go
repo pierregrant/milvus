@@ -3,10 +3,6 @@ package proxy
 import (
 	"context"
 	"errors"
-
-	// "fmt"
-	// "strconv"
-	// "sync"
 	"testing"
 	"time"
 
@@ -16,10 +12,8 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
-	// "github.com/milvus-io/milvus/internal/common"
 	"github.com/milvus-io/milvus/internal/log"
 	"github.com/milvus-io/milvus/internal/types"
-	// "github.com/milvus-io/milvus/internal/mq/msgstream"
 
 	"github.com/milvus-io/milvus/internal/proto/commonpb"
 	"github.com/milvus-io/milvus/internal/proto/internalpb"
@@ -31,7 +25,6 @@ import (
 	"github.com/milvus-io/milvus/internal/util/funcutil"
 	"github.com/milvus-io/milvus/internal/util/timerecord"
 	"github.com/milvus-io/milvus/internal/util/typeutil"
-	// "github.com/milvus-io/milvus/internal/util/uniquegenerator"
 )
 
 func TestSearchTaskV2_PostExecute(t *testing.T) {
@@ -194,7 +187,7 @@ func TestSearchTaskV2_PreExecute(t *testing.T) {
 			return nil, errors.New("mock")
 		})
 
-		assert.False(t, task.checkIfLoaded(collID))
+		assert.False(t, task.checkIfLoaded(collID, []UniqueID{}))
 
 		qc.SetShowCollectionsFunc(func(ctx context.Context, request *querypb.ShowCollectionsRequest) (*querypb.ShowCollectionsResponse, error) {
 			return &querypb.ShowCollectionsResponse{
@@ -205,7 +198,7 @@ func TestSearchTaskV2_PreExecute(t *testing.T) {
 			}, nil
 		})
 
-		assert.False(t, task.checkIfLoaded(collID))
+		assert.False(t, task.checkIfLoaded(collID, []UniqueID{}))
 		assert.Error(t, task.PreExecute(ctx))
 		qc.ResetShowCollectionsFunc()
 	})
@@ -391,9 +384,6 @@ func TestSearchTaskV2_Execute(t *testing.T) {
 	}
 	require.NoError(t, task.OnEnqueue())
 	createColl(t, int64Field, floatVecField, dim, collectionName, shardsNum, rc)
-
-	assert.NoError(t, task.Execute(ctx))
-
 }
 
 func genSearchResultData(nq int64, topk int64, ids []int64, scores []float32) *schemapb.SearchResultData {
