@@ -1251,6 +1251,7 @@ func (lst *loadSegmentTask) reschedule(ctx context.Context) ([]task, error) {
 				CollectionID: lst.GetCollectionID(),
 				PartitionIDs: lst.GetLoadMeta().GetPartitionIDs(),
 			},
+			ReplicaID: lst.ReplicaID,
 		}
 		loadSegmentReqs = append(loadSegmentReqs, req)
 	}
@@ -1747,6 +1748,7 @@ func (ht *handoffTask) execute(ctx context.Context) error {
 				}
 				// we should copy a request because assignInternalTask will change DstNodeID of LoadSegmentRequest
 				clonedReq := proto.Clone(loadSegmentReq).(*querypb.LoadSegmentsRequest)
+				clonedReq.ReplicaID = replica.ReplicaID
 				tasks, err := assignInternalTask(ctx, ht, ht.meta, ht.cluster, []*querypb.LoadSegmentsRequest{clonedReq}, nil, true, nil, nil, replica.GetReplicaID())
 				if err != nil {
 					log.Error("handoffTask: assign child task failed", zap.Int64("collectionID", collectionID), zap.Int64("segmentID", segmentID), zap.Error(err))
@@ -1938,6 +1940,11 @@ func (lbt *loadBalanceTask) execute(ctx context.Context) error {
 					toRecoverPartitionIDs = collectionInfo.PartitionIDs
 				}
 				log.Debug("loadBalanceTask: get collection's all partitionIDs", zap.Int64("collectionID", collectionID), zap.Int64s("partitionIDs", toRecoverPartitionIDs))
+				replica, err := lbt.getReplica(nodeID, collectionID)
+				if err != nil {
+					lbt.setResultInfo(err)
+					return err
+				}
 
 				for _, partitionID := range toRecoverPartitionIDs {
 					vChannelInfos, binlogs, err := lbt.broker.getRecoveryInfo(lbt.ctx, collectionID, partitionID)
@@ -1963,6 +1970,7 @@ func (lbt *loadBalanceTask) execute(ctx context.Context) error {
 									CollectionID: collectionID,
 									PartitionIDs: toRecoverPartitionIDs,
 								},
+								ReplicaID: replica.ReplicaID,
 							}
 
 							loadSegmentReqs = append(loadSegmentReqs, loadSegmentReq)
@@ -2005,6 +2013,7 @@ func (lbt *loadBalanceTask) execute(ctx context.Context) error {
 								CollectionID: collectionID,
 								PartitionIDs: toRecoverPartitionIDs,
 							},
+							ReplicaID: replica.ReplicaID,
 						}
 
 						if collectionInfo.LoadType == querypb.LoadType_LoadPartition {
@@ -2015,11 +2024,6 @@ func (lbt *loadBalanceTask) execute(ctx context.Context) error {
 					}
 				}
 
-				replica, err := lbt.getReplica(nodeID, collectionID)
-				if err != nil {
-					lbt.setResultInfo(err)
-					return err
-				}
 				tasks, err := assignInternalTask(ctx, lbt, lbt.meta, lbt.cluster, loadSegmentReqs, watchDmChannelReqs, true, lbt.SourceNodeIDs, lbt.DstNodeIDs, replica.GetReplicaID())
 				if err != nil {
 					log.Error("loadBalanceTask: assign child task failed", zap.Int64("sourceNodeID", nodeID))
@@ -2133,6 +2137,7 @@ func (lbt *loadBalanceTask) execute(ctx context.Context) error {
 						Infos:        []*querypb.SegmentLoadInfo{segmentLoadInfo},
 						Schema:       collectionInfo.Schema,
 						CollectionID: collectionID,
+						ReplicaID:    lbt.replicaID,
 					}
 					loadSegmentReqs = append(loadSegmentReqs, loadSegmentReq)
 				}
