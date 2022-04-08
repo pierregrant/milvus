@@ -3,6 +3,7 @@ package proxy
 import (
 	"context"
 	"errors"
+
 	// "fmt"
 	// "strconv"
 	// "sync"
@@ -17,6 +18,7 @@ import (
 
 	// "github.com/milvus-io/milvus/internal/common"
 	"github.com/milvus-io/milvus/internal/log"
+	"github.com/milvus-io/milvus/internal/types"
 	// "github.com/milvus-io/milvus/internal/mq/msgstream"
 
 	"github.com/milvus-io/milvus/internal/proto/commonpb"
@@ -71,6 +73,29 @@ func TestSearchTaskV2_PostExecute(t *testing.T) {
 	})
 }
 
+func createColl(t *testing.T, fInt64 string, fFloatVec string, dim int, name string, shardNum int32, rc types.RootCoord) {
+	schema := constructCollectionSchema(fInt64, fFloatVec, dim, name)
+	marshaledSchema, err := proto.Marshal(schema)
+	require.NoError(t, err)
+	ctx := context.TODO()
+
+	createColT := &createCollectionTask{
+		Condition: NewTaskCondition(context.TODO()),
+		CreateCollectionRequest: &milvuspb.CreateCollectionRequest{
+			CollectionName: name,
+			Schema:         marshaledSchema,
+			ShardsNum:      shardNum,
+		},
+		ctx:       ctx,
+		rootCoord: rc,
+	}
+
+	require.NoError(t, createColT.OnEnqueue())
+	require.NoError(t, createColT.PreExecute(ctx))
+	require.NoError(t, createColT.Execute(ctx))
+	require.NoError(t, createColT.PostExecute(ctx))
+}
+
 func TestSearchTaskV2_PreExecute(t *testing.T) {
 	var err error
 
@@ -100,28 +125,6 @@ func TestSearchTaskV2_PreExecute(t *testing.T) {
 		floatVecField = "fvec"
 	)
 
-	createColl := func(t *testing.T, fInt64 string, fFloatVec string, dim int, name string) {
-		schema := constructCollectionSchema(int64Field, floatVecField, dim, collectionName)
-		marshaledSchema, err := proto.Marshal(schema)
-		require.NoError(t, err)
-
-		createColT := &createCollectionTask{
-			Condition: NewTaskCondition(context.TODO()),
-			CreateCollectionRequest: &milvuspb.CreateCollectionRequest{
-				CollectionName: collectionName,
-				Schema:         marshaledSchema,
-				ShardsNum:      shardsNum,
-			},
-			ctx:       context.TODO(),
-			rootCoord: rc,
-		}
-
-		require.NoError(t, createColT.OnEnqueue())
-		require.NoError(t, createColT.PreExecute(ctx))
-		require.NoError(t, createColT.Execute(ctx))
-		require.NoError(t, createColT.PostExecute(ctx))
-	}
-
 	getSearchTask := func(t *testing.T) *searchTaskV2 {
 		task := &searchTaskV2{
 			ctx:           ctx,
@@ -144,7 +147,7 @@ func TestSearchTaskV2_PreExecute(t *testing.T) {
 
 	t.Run("invalid collection name", func(t *testing.T) {
 		task := getSearchTask(t)
-		createColl(t, int64Field, floatVecField, dim, collectionName)
+		createColl(t, int64Field, floatVecField, dim, collectionName, shardsNum, rc)
 
 		invalidCollNameTests := []struct {
 			inCollName  string
@@ -164,7 +167,7 @@ func TestSearchTaskV2_PreExecute(t *testing.T) {
 
 	t.Run("invalid partition names", func(t *testing.T) {
 		task := getSearchTask(t)
-		createColl(t, int64Field, floatVecField, dim, collectionName)
+		createColl(t, int64Field, floatVecField, dim, collectionName, shardsNum, rc)
 
 		invalidCollNameTests := []struct {
 			inPartNames []string
@@ -207,7 +210,7 @@ func TestSearchTaskV2_PreExecute(t *testing.T) {
 		qc.ResetShowCollectionsFunc()
 	})
 
-	createColl(t, int64Field, floatVecField, dim, collectionName)
+	createColl(t, int64Field, floatVecField, dim, collectionName, shardsNum, rc)
 	collID, err := globalMetaCache.GetCollectionID(context.TODO(), collectionName)
 	require.NoError(t, err)
 	status, err := qc.LoadCollection(ctx, &querypb.LoadCollectionRequest{
@@ -342,108 +345,55 @@ func TestSearchTaskV2_PreExecute(t *testing.T) {
 	// TODO: test partition-related error
 }
 
-func TestSearchTaskV2_Ts(t *testing.T) {
-	// Params.Init()
-	//
-	// task := &searchTaskV2{
-	//     SearchRequest: &internalpb.SearchRequest{
-	//         Base: nil,
-	//     },
-	//     tr: timerecord.NewTimeRecorder("search"),
-	// }
-	// assert.NoError(t, task.OnEnqueue())
-	//
-	// ts := Timestamp(time.Now().Nanosecond())
-	// task.SetTs(ts)
-	// assert.Equal(t, ts, task.BeginTs())
-	// assert.Equal(t, ts, task.EndTs())
-}
-
 func TestSearchTaskV2_Execute(t *testing.T) {
-	// var err error
-	//
-	// Params.Init()
-	// Params.ProxyCfg.SearchResultChannelNames = []string{funcutil.GenRandomStr()}
-	//
-	// rc := NewRootCoordMock()
-	// rc.Start()
-	// defer rc.Stop()
-	//
-	// qc := NewQueryCoordMock()
-	// qc.Start()
-	// defer qc.Stop()
-	//
-	// ctx := context.Background()
-	//
-	// err = InitMetaCache(rc)
-	// assert.NoError(t, err)
-	//
-	// dmlChannelsFunc := getDmlChannelsFunc(ctx, rc)
-	// query := newMockGetChannelsService()
-	// factory := newSimpleMockMsgStreamFactory()
-	//
-	// prefix := "TestSearchTaskV2_Execute"
-	// collectionName := prefix + funcutil.GenRandomStr()
-	// shardsNum := int32(2)
-	// int64Field := "int64"
-	// floatVecField := "fvec"
-	// dim := 128
-	//
-	// task := &searchTaskV2{
-	//     ctx: ctx,
-	//     SearchRequest: &internalpb.SearchRequest{
-	//         Base: &commonpb.MsgBase{
-	//             MsgType:   commonpb.MsgType_Search,
-	//             MsgID:     0,
-	//             Timestamp: uint64(time.Now().UnixNano()),
-	//             SourceID:  0,
-	//         },
-	//     },
-	//     request: &milvuspb.SearchRequest{
-	//         CollectionName: collectionName,
-	//     },
-	//     result: &milvuspb.SearchResults{
-	//         Status:  &commonpb.Status{},
-	//         Results: nil,
-	//     },
-	//     qc:    qc,
-	//     tr:    timerecord.NewTimeRecorder("search"),
-	// }
-	// assert.NoError(t, task.OnEnqueue())
-	//
-	// // collection not exist
-	// assert.Error(t, task.PreExecute(ctx))
-	//
-	// schema := constructCollectionSchema(int64Field, floatVecField, dim, collectionName)
-	// marshaledSchema, err := proto.Marshal(schema)
-	// assert.NoError(t, err)
-	//
-	// createColT := &createCollectionTask{
-	//     Condition: NewTaskCondition(ctx),
-	//     CreateCollectionRequest: &milvuspb.CreateCollectionRequest{
-	//         Base:           nil,
-	//         CollectionName: collectionName,
-	//         Schema:         marshaledSchema,
-	//         ShardsNum:      shardsNum,
-	//     },
-	//     ctx:       ctx,
-	//     rootCoord: rc,
-	//     result:    nil,
-	//     schema:    nil,
-	// }
-	//
-	// assert.NoError(t, createColT.OnEnqueue())
-	// assert.NoError(t, createColT.PreExecute(ctx))
-	// assert.NoError(t, createColT.Execute(ctx))
-	// assert.NoError(t, createColT.PostExecute(ctx))
-	//
-	// assert.NoError(t, task.Execute(ctx))
-	//
-	// query.f = func(collectionID UniqueID) (map[vChan]pChan, error) {
-	//     return nil, errors.New("mock")
-	// }
-	// assert.Error(t, task.Execute(ctx))
-	// // TODO(dragondriver): cover getDQLStream
+	Params.Init()
+
+	var (
+		err error
+
+		rc  = NewRootCoordMock()
+		qc  = NewQueryCoordMock()
+		ctx = context.TODO()
+
+		shardsNum      = int32(2)
+		int64Field     = "int64"
+		floatVecField  = "fvec"
+		dim            = 128
+		collectionName = t.Name() + funcutil.GenRandomStr()
+	)
+
+	err = rc.Start()
+	require.NoError(t, err)
+	defer rc.Stop()
+	err = InitMetaCache(rc)
+	require.NoError(t, err)
+
+	err = qc.Start()
+	require.NoError(t, err)
+	defer qc.Stop()
+
+	task := &searchTaskV2{
+		ctx: ctx,
+		SearchRequest: &internalpb.SearchRequest{
+			Base: &commonpb.MsgBase{
+				MsgType:   commonpb.MsgType_Search,
+				Timestamp: uint64(time.Now().UnixNano()),
+			},
+		},
+		request: &milvuspb.SearchRequest{
+			CollectionName: collectionName,
+		},
+		result: &milvuspb.SearchResults{
+			Status: &commonpb.Status{},
+		},
+		qc: qc,
+		tr: timerecord.NewTimeRecorder("search"),
+	}
+	require.NoError(t, task.OnEnqueue())
+	createColl(t, int64Field, floatVecField, dim, collectionName, shardsNum, rc)
+
+	assert.NoError(t, task.Execute(ctx))
+
 }
 
 func genSearchResultData(nq int64, topk int64, ids []int64, scores []float32) *schemapb.SearchResultData {
@@ -461,6 +411,21 @@ func genSearchResultData(nq int64, topk int64, ids []int64, scores []float32) *s
 		},
 		Topks: make([]int64, nq),
 	}
+}
+
+func TestSearchTaskV2_Ts(t *testing.T) {
+	Params.Init()
+	task := &searchTaskV2{
+		SearchRequest: &internalpb.SearchRequest{},
+
+		tr: timerecord.NewTimeRecorder("test-search"),
+	}
+	require.NoError(t, task.OnEnqueue())
+
+	ts := Timestamp(time.Now().Nanosecond())
+	task.SetTs(ts)
+	assert.Equal(t, ts, task.BeginTs())
+	assert.Equal(t, ts, task.EndTs())
 }
 
 func TestSearchTaskV2_Reduce(t *testing.T) {
