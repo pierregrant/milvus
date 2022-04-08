@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"math"
 	"sync"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/atomic"
@@ -58,6 +59,7 @@ type queryShard struct {
 	watcherCond       *sync.Cond
 	serviceDmTs       atomic.Uint64
 	serviceDeltaTs    atomic.Uint64
+	ticker            *time.Ticker // timed ticker for trigger timeout check
 
 	localChunkManager  storage.ChunkManager
 	remoteChunkManager storage.ChunkManager
@@ -122,8 +124,24 @@ func (q *queryShard) initTSafeWatcher() error {
 
 	go q.watchTs(q.dmTSafeWatcher.watcherChan(), q.dmTSafeWatcher.closeCh, tsTypeDML)
 	go q.watchTs(q.dmTSafeWatcher.watcherChan(), q.deltaTSafeWatcher.closeCh, tsTypeDelta)
+	go q.startTsTicker()
 
 	return nil
+}
+
+func (q *queryShard) startTsTicker() {
+	q.ticker = time.NewTicker(time.Millisecond * 10) // check timeout every 10 milliseconds
+	defer q.ticker.Stop()
+	for {
+		select {
+		case <-q.ticker.C:
+			q.watcherCond.L.Lock()
+			q.watcherCond.Broadcast()
+			q.watcherCond.L.Unlock()
+		case <-q.ctx.Done():
+			return
+		}
+	}
 }
 
 func (q *queryShard) close() {
@@ -185,13 +203,16 @@ func (q *queryShard) getNewTSafe(tp tsType) (Timestamp, error) {
 	return t, nil
 }
 
-func (q *queryShard) waitUntilServiceable(guaranteeTs Timestamp) {
+func (q *queryShard) waitUntilServiceable(ctx context.Context, guaranteeTs Timestamp) {
 	q.watcherCond.L.Lock()
 	defer q.watcherCond.L.Unlock()
 	st := q.getServiceableTime()
 	for guaranteeTs > st {
 		log.Debug("serviceable ts before guarantee ts", zap.Uint64("serviceable ts", st), zap.Uint64("guarantee ts", guaranteeTs))
 		q.watcherCond.Wait()
+		if err := ctx.Err(); err != nil {
+			return
+		}
 		st = q.getServiceableTime()
 	}
 	log.Debug("wait serviceable ts done")
@@ -247,7 +268,12 @@ func (q *queryShard) search(ctx context.Context, req *querypb.SearchRequest) (*i
 
 	// hold request until guarantee timestamp >= service timestamp
 	guaranteeTs := req.GetReq().GetGuaranteeTimestamp()
-	q.waitUntilServiceable(guaranteeTs)
+	q.waitUntilServiceable(ctx, guaranteeTs)
+
+	// check ctx timeout
+	if !funcutil.CheckCtxValid(ctx) {
+		return nil, errors.New("search context timeout")
+	}
 
 	q.historical.replica.queryRLock()
 	q.streaming.replica.queryRLock()
@@ -592,7 +618,12 @@ func (q *queryShard) query(ctx context.Context, req *querypb.QueryRequest) (*int
 
 	// hold request until guarantee timestamp >= service timestamp
 	guaranteeTs := req.GetReq().GetGuaranteeTimestamp()
-	q.waitUntilServiceable(guaranteeTs)
+	q.waitUntilServiceable(ctx, guaranteeTs)
+
+	// check ctx timeout
+	if !funcutil.CheckCtxValid(ctx) {
+		return nil, errors.New("search context timeout")
+	}
 
 	// deserialize query plan
 	collection, err := q.streaming.replica.getCollectionByID(collectionID)
