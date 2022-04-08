@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -274,6 +275,8 @@ func (t *queryTaskV2) PostExecute(ctx context.Context) error {
 		tr.Elapse("done")
 	}()
 
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 	go func() {
 		for {
 			select {
@@ -287,6 +290,7 @@ func (t *queryTaskV2) PostExecute(ctx context.Context) error {
 					t.toReduceResults = append(t.toReduceResults, res)
 					log.Debug("proxy receives one query result", zap.Int64("sourceID", res.GetBase().GetSourceID()), zap.Any("taskID", t.ID()))
 				}
+				wg.Done()
 				return
 			}
 		}
@@ -297,6 +301,7 @@ func (t *queryTaskV2) PostExecute(ctx context.Context) error {
 		return err
 	}
 
+	wg.Wait()
 	t.result, err = mergeRetrieveResults(t.toReduceResults)
 	if err != nil {
 		return err
