@@ -1251,6 +1251,7 @@ func (lst *loadSegmentTask) reschedule(ctx context.Context) ([]task, error) {
 				CollectionID: lst.GetCollectionID(),
 				PartitionIDs: lst.GetLoadMeta().GetPartitionIDs(),
 			},
+			ReplicaID: lst.ReplicaID,
 		}
 		loadSegmentReqs = append(loadSegmentReqs, req)
 	}
@@ -1949,23 +1950,26 @@ func (lbt *loadBalanceTask) execute(ctx context.Context) error {
 
 					for _, segmentBingLog := range binlogs {
 						segmentID := segmentBingLog.SegmentID
-						if _, ok := segmentID2Info[segmentID]; ok {
+						if info, ok := segmentID2Info[segmentID]; ok {
 							segmentLoadInfo := lbt.broker.generateSegmentLoadInfo(ctx, collectionID, partitionID, segmentBingLog, true, schema)
 							msgBase := proto.Clone(lbt.Base).(*commonpb.MsgBase)
 							msgBase.MsgType = commonpb.MsgType_LoadSegments
-							loadSegmentReq := &querypb.LoadSegmentsRequest{
-								Base:         msgBase,
-								Infos:        []*querypb.SegmentLoadInfo{segmentLoadInfo},
-								Schema:       schema,
-								CollectionID: collectionID,
-								LoadMeta: &querypb.LoadMetaInfo{
-									LoadType:     collectionInfo.LoadType,
+							for _, replica := range info.ReplicaIds {
+								loadSegmentReq := &querypb.LoadSegmentsRequest{
+									Base:         msgBase,
+									Infos:        []*querypb.SegmentLoadInfo{segmentLoadInfo},
+									Schema:       schema,
 									CollectionID: collectionID,
-									PartitionIDs: toRecoverPartitionIDs,
-								},
-							}
+									LoadMeta: &querypb.LoadMetaInfo{
+										LoadType:     collectionInfo.LoadType,
+										CollectionID: collectionID,
+										PartitionIDs: toRecoverPartitionIDs,
+									},
+									ReplicaID: replica,
+								}
 
-							loadSegmentReqs = append(loadSegmentReqs, loadSegmentReq)
+								loadSegmentReqs = append(loadSegmentReqs, loadSegmentReq)
+							}
 						}
 					}
 
@@ -1992,7 +1996,7 @@ func (lbt *loadBalanceTask) execute(ctx context.Context) error {
 
 				mergedDmChannel := mergeDmChannelInfo(dmChannelInfos)
 				for channelName, vChannelInfo := range mergedDmChannel {
-					if _, ok := dmChannel2WatchInfo[channelName]; ok {
+					if info, ok := dmChannel2WatchInfo[channelName]; ok {
 						msgBase := proto.Clone(lbt.Base).(*commonpb.MsgBase)
 						msgBase.MsgType = commonpb.MsgType_WatchDmChannels
 						watchRequest := &querypb.WatchDmChannelsRequest{
@@ -2005,6 +2009,7 @@ func (lbt *loadBalanceTask) execute(ctx context.Context) error {
 								CollectionID: collectionID,
 								PartitionIDs: toRecoverPartitionIDs,
 							},
+							ReplicaID: info.ReplicaID,
 						}
 
 						if collectionInfo.LoadType == querypb.LoadType_LoadPartition {
@@ -2124,17 +2129,21 @@ func (lbt *loadBalanceTask) execute(ctx context.Context) error {
 						log.Warn("loadBalanceTask: can't find binlog of segment to balance, may be has been compacted", zap.Int64("segmentID", segmentID))
 						continue
 					}
-					segmentBingLog := segmentID2Binlog[segmentID]
-					segmentLoadInfo := lbt.broker.generateSegmentLoadInfo(ctx, collectionID, partitionID, segmentBingLog, true, collectionInfo.Schema)
-					msgBase := proto.Clone(lbt.Base).(*commonpb.MsgBase)
-					msgBase.MsgType = commonpb.MsgType_LoadSegments
-					loadSegmentReq := &querypb.LoadSegmentsRequest{
-						Base:         msgBase,
-						Infos:        []*querypb.SegmentLoadInfo{segmentLoadInfo},
-						Schema:       collectionInfo.Schema,
-						CollectionID: collectionID,
+
+					for _, replica := range segmentInfo.ReplicaIds {
+						segmentBingLog := segmentID2Binlog[segmentID]
+						segmentLoadInfo := lbt.broker.generateSegmentLoadInfo(ctx, collectionID, partitionID, segmentBingLog, true, collectionInfo.Schema)
+						msgBase := proto.Clone(lbt.Base).(*commonpb.MsgBase)
+						msgBase.MsgType = commonpb.MsgType_LoadSegments
+						loadSegmentReq := &querypb.LoadSegmentsRequest{
+							Base:         msgBase,
+							Infos:        []*querypb.SegmentLoadInfo{segmentLoadInfo},
+							Schema:       collectionInfo.Schema,
+							CollectionID: collectionID,
+							ReplicaID:    replica,
+						}
+						loadSegmentReqs = append(loadSegmentReqs, loadSegmentReq)
 					}
-					loadSegmentReqs = append(loadSegmentReqs, loadSegmentReq)
 				}
 
 				for _, info := range dmChannelInfos {
