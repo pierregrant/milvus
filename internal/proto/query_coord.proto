@@ -316,6 +316,7 @@ message DmChannelWatchInfo {
   int64 collectionID = 1;
   string dmChannel = 2;
   int64 nodeID_loaded = 3;
+  int64 replicaID = 4;
 }
 
 message QueryChannelInfo {
