@@ -391,7 +391,7 @@ func (sc *ShardCluster) segmentAllocations() map[int64][]int64 {
 // Search preforms search operation on shard cluster.
 func (sc *ShardCluster) Search(ctx context.Context, req *querypb.SearchRequest) ([]*internalpb.SearchResults, error) {
 	if sc.state.Load() != int32(available) {
-		return nil, fmt.Errorf("SharcCluster for %s replicaID %d is no available", sc.vchannelName, sc.replicaID)
+		return nil, fmt.Errorf("ShardCluster for %s replicaID %d is no available", sc.vchannelName, sc.replicaID)
 	}
 
 	if sc.vchannelName != req.GetDmlChannel() {
@@ -449,7 +449,7 @@ func (sc *ShardCluster) Search(ctx context.Context, req *querypb.SearchRequest) 
 // Query performs query operation on shard cluster.
 func (sc *ShardCluster) Query(ctx context.Context, req *querypb.QueryRequest) ([]*internalpb.RetrieveResults, error) {
 	if sc.state.Load() != int32(available) {
-		return nil, fmt.Errorf("SharcCluster for %s replicaID %d is no available", sc.vchannelName, sc.replicaID)
+		return nil, fmt.Errorf("ShardCluster for %s replicaID %d is no available", sc.vchannelName, sc.replicaID)
 	}
 
 	// handles only the dml channel part, segment ids is dispatch by cluster itself

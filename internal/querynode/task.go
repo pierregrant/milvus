@@ -255,6 +255,7 @@ func (w *watchDmChannelsTask) Execute(ctx context.Context) error {
 	log.Debug("Starting WatchDmChannels ...",
 		zap.String("collectionName", w.req.Schema.Name),
 		zap.Int64("collectionID", collectionID),
+		zap.Int64("replicaID", w.req.GetReplicaID()),
 		zap.Any("load type", lType),
 		zap.Strings("vChannels", vChannels),
 		zap.Strings("pChannels", pChannels),
