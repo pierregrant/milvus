@@ -67,10 +67,6 @@ func (t *queryTaskV2) PreExecute(ctx context.Context) error {
 		return err
 	}
 
-	if !t.checkIfLoaded(collID) {
-		return fmt.Errorf("collection %v was not loaded into memory", collectionName)
-	}
-
 	t.CollectionID = collID
 	log.Info("Get collection ID by name",
 		zap.Int64("collectionID", t.CollectionID), zap.String("collection name", collectionName),
@@ -121,6 +117,10 @@ func (t *queryTaskV2) PreExecute(ctx context.Context) error {
 			errMsg := fmt.Sprintf("partition name: %s not found", partitionName)
 			return errors.New(errMsg)
 		}
+	}
+
+	if !t.checkIfLoaded(collID, t.PartitionIDs) {
+		return fmt.Errorf("collection:%v or partition:%v not loaded into memory", collectionName, t.request.GetPartitionNames())
 	}
 
 	schema, _ := globalMetaCache.GetCollectionSchema(ctx, collectionName)
@@ -430,7 +430,7 @@ func (t *queryTaskV2) RoundRobin(query func(UniqueID, types.QueryNode) error, le
 	return nil
 }
 
-func (t *queryTaskV2) checkIfLoaded(collectionID UniqueID) bool {
+func (t *queryTaskV2) checkIfLoaded(collectionID UniqueID, partitionIDs []UniqueID) bool {
 	resp, err := t.qc.ShowCollections(t.ctx, &querypb.ShowCollectionsRequest{
 		Base: &commonpb.MsgBase{
 			MsgType:   commonpb.MsgType_ShowCollections,
@@ -453,13 +453,48 @@ func (t *queryTaskV2) checkIfLoaded(collectionID UniqueID) bool {
 		return false
 	}
 
+	loaded := true
 	for index, collID := range resp.CollectionIDs {
 		if collID == collectionID && resp.GetInMemoryPercentages()[index] >= int64(100) {
-			return true
+			loaded = false
+			break
 		}
 	}
 
-	return false
+	if !loaded && len(partitionIDs) > 0 {
+		resp, err := t.qc.ShowPartitions(t.ctx, &querypb.ShowPartitionsRequest{
+			Base: &commonpb.MsgBase{
+				MsgType:   commonpb.MsgType_ShowCollections,
+				MsgID:     t.Base.MsgID,
+				Timestamp: t.Base.Timestamp,
+				SourceID:  Params.ProxyCfg.ProxyID,
+			},
+			CollectionID: collectionID,
+			PartitionIDs: partitionIDs,
+		})
+		if err != nil {
+			log.Warn("fail to show partitions by QueryCoord",
+				zap.Int64("requestID", t.Base.MsgID),
+				zap.Int64("collectionID", collectionID),
+				zap.Int64s("partitionIDs", partitionIDs),
+				zap.String("requestType", "search"),
+				zap.Error(err))
+			return false
+		}
+
+		if resp.Status.ErrorCode != commonpb.ErrorCode_Success {
+			log.Warn("fail to show partitions by QueryCoord",
+				zap.Int64("collectionID", collectionID),
+				zap.Int64s("partitionIDs", partitionIDs),
+				zap.Int64("requestID", t.Base.MsgID), zap.String("requestType", "search"),
+				zap.String("reason", resp.GetStatus().GetReason()))
+			return false
+		}
+		// Current logic: show partitions won't return error if the given partitions are all loaded
+		return true
+
+	}
+	return loaded
 }
 
 // IDs2Expr converts ids slices to bool expresion with specified field name
