@@ -185,12 +185,16 @@ func (q *queryShard) getNewTSafe(tp tsType) (Timestamp, error) {
 	return t, nil
 }
 
-func (q *queryShard) waitUntilServiceable(gauranteeTs Timestamp) {
+func (q *queryShard) waitUntilServiceable(guaranteeTs Timestamp) {
 	q.watcherCond.L.Lock()
 	defer q.watcherCond.L.Unlock()
-	for gauranteeTs > q.getServiceableTime() {
+	st := q.getServiceableTime()
+	for guaranteeTs > st {
+		log.Debug("serviceable ts before guarantee ts", zap.Uint64("serviceable ts", st), zap.Uint64("guarantee ts", guaranteeTs))
 		q.watcherCond.Wait()
+		st = q.getServiceableTime()
 	}
+	log.Debug("wait serviceable ts done")
 }
 
 func (q *queryShard) getServiceableTime() Timestamp {
@@ -248,7 +252,7 @@ func (q *queryShard) search(ctx context.Context, req *querypb.SearchRequest) (*i
 	q.historical.replica.queryRLock()
 	q.streaming.replica.queryRLock()
 	defer q.historical.replica.queryRUnlock()
-	defer q.streaming.replica.queryRLock()
+	defer q.streaming.replica.queryRUnlock()
 
 	// deserialize query plan
 	collection, err := q.historical.replica.getCollectionByID(collectionID)
