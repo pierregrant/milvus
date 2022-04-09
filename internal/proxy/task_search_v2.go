@@ -575,7 +575,7 @@ func checkSearchResultData(data *schemapb.SearchResultData, nq int64, topk int64
 
 func selectSearchResultData(dataArray []*schemapb.SearchResultData, offsets []int64, topk int64, qi int64) int {
 	sel := -1
-	maxDistance := minFloat32
+	maxDistance := minFloat32        // distance here means score :)
 	for i, offset := range offsets { // query num, the number of ways to merge
 		if offset >= topk {
 			continue
@@ -685,7 +685,7 @@ func reduceSearchResultData(searchResultData []*schemapb.SearchResultData, nq in
 			ret.Results.Scores[k] *= -1
 		}
 	}
-
+	// printSearchResultData(ret.Results, "proxy reduce result")
 	return ret, nil
 }
 

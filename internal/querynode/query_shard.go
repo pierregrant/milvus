@@ -35,7 +35,6 @@ import (
 	"github.com/milvus-io/milvus/internal/proto/querypb"
 	"github.com/milvus-io/milvus/internal/proto/schemapb"
 	"github.com/milvus-io/milvus/internal/storage"
-	"github.com/milvus-io/milvus/internal/util/distance"
 	"github.com/milvus-io/milvus/internal/util/funcutil"
 	"github.com/milvus-io/milvus/internal/util/tsoutil"
 	"github.com/milvus-io/milvus/internal/util/typeutil"
@@ -391,23 +390,55 @@ func (q *queryShard) search(ctx context.Context, req *querypb.SearchRequest) (*i
 				SlicedOffset:   1,
 				SlicedNumCount: 1,
 			})
+		} else {
+			// complete results with merged streaming result
+			results = append(results, &internalpb.SearchResults{
+				Status:         &commonpb.Status{ErrorCode: commonpb.ErrorCode_Success},
+				MetricType:     plan.getMetricType(),
+				NumQueries:     queryNum,
+				TopK:           topK,
+				SlicedBlob:     nil,
+				SlicedOffset:   1,
+				SlicedNumCount: 1,
+			})
 		}
 
 		// reduce shard search results: unmarshal -> reduce -> marshal
+		log.Debug("shard leader get search results", zap.Int("numbers", len(results)))
 		searchResultData, err := decodeSearchResults(results)
 		if err != nil {
-			log.Warn("decode search results error", zap.Error(err))
+			log.Warn("shard leader decode search results errors", zap.Error(err))
 			return nil, err
 		}
+		log.Debug("shard leader get valid search results", zap.Int("numbers", len(searchResultData)))
+
+		for i, sData := range searchResultData {
+			log.Debug("reduceSearchResultData",
+				zap.Int("result No.", i),
+				zap.Int64("nq", sData.NumQueries),
+				zap.Int64("topk", sData.TopK),
+				zap.String("ids", sData.Ids.String()),
+				zap.Any("len(FieldsData)", len(sData.FieldsData)))
+		}
+
 		reducedResultData, err := reduceSearchResultData(searchResultData, queryNum, plan.getTopK(), plan.getMetricType())
 		if err != nil {
-			log.Warn("reduce search results error", zap.Error(err))
+			log.Warn("shard leader reduce errors", zap.Error(err))
 			return nil, err
 		}
 		searchResults, err := encodeSearchResultData(reducedResultData, queryNum, plan.getTopK(), plan.getMetricType())
 		if err != nil {
-			log.Warn("encode search results error", zap.Error(err))
+			log.Warn("shard leader encode search result errors", zap.Error(err))
 			return nil, err
+		}
+		if searchResults.SlicedBlob == nil {
+			log.Debug("shard leader send nil results to proxy",
+				zap.String("shard", q.channel))
+		} else {
+			log.Debug("shard leader send non-nil results to proxy",
+				zap.String("shard", q.channel),
+				zap.String("ids", reducedResultData.Ids.String()))
+			// printSearchResultData(reducedResultData, q.channel)
 		}
 		return searchResults, nil
 	}
@@ -467,6 +498,7 @@ func (q *queryShard) search(ctx context.Context, req *querypb.SearchRequest) (*i
 		SlicedOffset:   1,
 		SlicedNumCount: 1,
 	}
+	log.Debug("shard follower send search result to leader")
 	return resp, nil
 }
 
@@ -503,7 +535,8 @@ func reduceSearchResultData(searchResultData []*schemapb.SearchResultData, nq in
 	}
 
 	var skipDupCnt int64
-	var realTopK int64 = -1
+	var dummyCnt int64
+	// var realTopK int64 = -1
 	for i := int64(0); i < nq; i++ {
 		offsets := make([]int64, len(searchResultData))
 
@@ -536,21 +569,31 @@ func reduceSearchResultData(searchResultData []*schemapb.SearchResultData, nq in
 			}
 			offsets[sel]++
 		}
-		if realTopK != -1 && realTopK != j {
-			log.Warn("Proxy Reduce Search Result", zap.Error(errors.New("the length (topk) between all result of query is different")))
-			// return nil, errors.New("the length (topk) between all result of query is different")
+		// add empty data
+		for j < topk {
+			typeutil.AppendFieldData(ret.FieldsData, searchResultData[0].FieldsData, 0)
+			ret.Ids.GetIntId().Data = append(ret.Ids.GetIntId().Data, -1)
+			ret.Scores = append(ret.Scores, -1*float32(math.MaxFloat32))
+			j++
+			dummyCnt++
 		}
-		realTopK = j
-		ret.Topks = append(ret.Topks, realTopK)
+
+		// if realTopK != -1 && realTopK != j {
+		// 	log.Warn("Proxy Reduce Search Result", zap.Error(errors.New("the length (topk) between all result of query is different")))
+		// 	// return nil, errors.New("the length (topk) between all result of query is different")
+		// }
+		// realTopK = j
+		// ret.Topks = append(ret.Topks, realTopK)
 	}
 	log.Debug("skip duplicated search result", zap.Int64("count", skipDupCnt))
-	ret.TopK = realTopK
+	log.Debug("add dummy data in search result", zap.Int64("count", dummyCnt))
+	// ret.TopK = realTopK
 
-	if !distance.PositivelyRelated(metricType) {
-		for k := range ret.Scores {
-			ret.Scores[k] *= -1
-		}
-	}
+	// if !distance.PositivelyRelated(metricType) {
+	// 	for k := range ret.Scores {
+	// 		ret.Scores[k] *= -1
+	// 	}
+	// }
 
 	return ret, nil
 }
@@ -601,10 +644,14 @@ func encodeSearchResultData(searchResultData *schemapb.SearchResultData, nq int6
 		NumQueries: nq,
 		TopK:       topk,
 		MetricType: metricType,
+		SlicedBlob: nil,
 	}
-	searchResults.SlicedBlob, err = proto.Marshal(searchResultData)
+	slicedBlob, err := proto.Marshal(searchResultData)
 	if err != nil {
 		return nil, err
+	}
+	if searchResultData != nil && searchResultData.Ids != nil && len(searchResultData.Ids.GetIntId().Data) != 0 {
+		searchResults.SlicedBlob = slicedBlob
 	}
 	return
 }
@@ -761,3 +808,15 @@ func mergeInternalRetrieveResults(retrieveResults []*internalpb.RetrieveResults)
 
 	return ret, nil
 }
+
+// func printSearchResultData(data *schemapb.SearchResultData, header string) {
+// 	size := len(data.Ids.GetIntId().Data)
+// 	if size != len(data.Scores) {
+// 		log.Error("SearchResultData length mis-match")
+// 	}
+// 	log.Debug("==== SearchResultData ====",
+// 		zap.String("header", header), zap.Int64("nq", data.NumQueries), zap.Int64("topk", data.TopK))
+// 	for i := 0; i < size; i++ {
+// 		log.Debug("", zap.Int("i", i), zap.Int64("id", data.Ids.GetIntId().Data[i]), zap.Float32("score", data.Scores[i]))
+// 	}
+// }
