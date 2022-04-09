@@ -453,10 +453,10 @@ func (t *queryTaskV2) checkIfLoaded(collectionID UniqueID, partitionIDs []Unique
 		return false
 	}
 
-	loaded := true
+	loaded := false
 	for index, collID := range resp.CollectionIDs {
 		if collID == collectionID && resp.GetInMemoryPercentages()[index] >= int64(100) {
-			loaded = false
+			loaded = true
 			break
 		}
 	}
