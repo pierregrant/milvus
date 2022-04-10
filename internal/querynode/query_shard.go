@@ -58,6 +58,7 @@ type queryShard struct {
 	watcherCond       *sync.Cond
 	serviceDmTs       atomic.Uint64
 	serviceDeltaTs    atomic.Uint64
+	startTickerOnce   sync.Once
 	ticker            *time.Ticker // timed ticker for trigger timeout check
 
 	localChunkManager  storage.ChunkManager
@@ -102,45 +103,53 @@ func newQueryShard(
 	}
 	qs.deltaChannel = deltaChannel
 
-	qs.initTSafeWatcher()
 	return qs
 }
 
-func (q *queryShard) initTSafeWatcher() error {
+func (q *queryShard) watchDMLTSafe() error {
 	q.dmTSafeWatcher = newTSafeWatcher()
 	err := q.streaming.tSafeReplica.registerTSafeWatcher(q.channel, q.dmTSafeWatcher)
 	if err != nil {
 		log.Warn("failed to register dml tsafe watcher", zap.String("channel", q.channel), zap.Error(err))
 		return err
 	}
+	go q.watchTs(q.dmTSafeWatcher.watcherChan(), q.dmTSafeWatcher.closeCh, tsTypeDML)
 
+	q.startTsTicker()
+	return nil
+}
+
+func (q *queryShard) watchDeltaTSafe() error {
 	q.deltaTSafeWatcher = newTSafeWatcher()
-	err = q.streaming.tSafeReplica.registerTSafeWatcher(q.deltaChannel, q.deltaTSafeWatcher)
+	err := q.streaming.tSafeReplica.registerTSafeWatcher(q.deltaChannel, q.deltaTSafeWatcher)
 	if err != nil {
-		log.Warn("failed to register delta tsafe watcher", zap.String("channel", q.channel), zap.Error(err))
+		log.Warn("failed to register delta tsafe watcher", zap.String("channel", q.deltaChannel), zap.Error(err))
 		return err
 	}
 
-	go q.watchTs(q.dmTSafeWatcher.watcherChan(), q.dmTSafeWatcher.closeCh, tsTypeDML)
-	go q.watchTs(q.dmTSafeWatcher.watcherChan(), q.deltaTSafeWatcher.closeCh, tsTypeDelta)
-	go q.startTsTicker()
+	go q.watchTs(q.deltaTSafeWatcher.watcherChan(), q.deltaTSafeWatcher.closeCh, tsTypeDelta)
+	q.startTsTicker()
 
 	return nil
 }
 
 func (q *queryShard) startTsTicker() {
-	q.ticker = time.NewTicker(time.Millisecond * 10) // check timeout every 10 milliseconds
-	defer q.ticker.Stop()
-	for {
-		select {
-		case <-q.ticker.C:
-			q.watcherCond.L.Lock()
-			q.watcherCond.Broadcast()
-			q.watcherCond.L.Unlock()
-		case <-q.ctx.Done():
-			return
-		}
-	}
+	q.startTickerOnce.Do(func() {
+		go func() {
+			q.ticker = time.NewTicker(time.Millisecond * 10) // check timeout every 10 milliseconds
+			defer q.ticker.Stop()
+			for {
+				select {
+				case <-q.ticker.C:
+					q.watcherCond.L.Lock()
+					q.watcherCond.Broadcast()
+					q.watcherCond.L.Unlock()
+				case <-q.ctx.Done():
+					return
+				}
+			}
+		}()
+	})
 }
 
 func (q *queryShard) close() {
@@ -154,6 +163,16 @@ const (
 	tsTypeDML   tsType = 1
 	tsTypeDelta tsType = 2
 )
+
+func (tp tsType) String() string {
+	switch tp {
+	case tsTypeDML:
+		return "DML tSafe"
+	case tsTypeDelta:
+		return "Delta tSafe"
+	}
+	return ""
+}
 
 func (q *queryShard) watchTs(channel <-chan bool, closeCh <-chan struct{}, tp tsType) {
 	for {
@@ -202,34 +221,35 @@ func (q *queryShard) getNewTSafe(tp tsType) (Timestamp, error) {
 	return t, nil
 }
 
-func (q *queryShard) waitUntilServiceable(ctx context.Context, guaranteeTs Timestamp) {
+func (q *queryShard) waitUntilServiceable(ctx context.Context, guaranteeTs Timestamp, tp tsType) {
 	q.watcherCond.L.Lock()
 	defer q.watcherCond.L.Unlock()
-	st := q.getServiceableTime()
+	st := q.getServiceableTime(tp)
 	for guaranteeTs > st {
 		log.Debug("serviceable ts before guarantee ts", zap.Uint64("serviceable ts", st), zap.Uint64("guarantee ts", guaranteeTs))
 		q.watcherCond.Wait()
 		if err := ctx.Err(); err != nil {
+			log.Warn("waitUntialServiceable timeout", zap.Uint64("serviceable ts", st), zap.Uint64("guarantee ts", guaranteeTs))
 			return
 		}
-		st = q.getServiceableTime()
+		st = q.getServiceableTime(tp)
 	}
-	log.Debug("wait serviceable ts done")
+	log.Debug("wait serviceable ts done", zap.String("tsType", tp.String()), zap.Uint64("guarantee ts", guaranteeTs), zap.Uint64("serviceable ts", st))
 }
 
-func (q *queryShard) getServiceableTime() Timestamp {
+func (q *queryShard) getServiceableTime(tp tsType) Timestamp {
 	gracefulTimeInMilliSecond := Params.QueryNodeCfg.GracefulTime
 	gracefulTime := typeutil.ZeroTimestamp
 	if gracefulTimeInMilliSecond > 0 {
 		gracefulTime = tsoutil.ComposeTS(gracefulTimeInMilliSecond, 0)
 	}
-	var serviceTs, serviceDeltaTs Timestamp
-	serviceTs = q.serviceDmTs.Load()
-	serviceDeltaTs = q.serviceDeltaTs.Load()
-	if serviceDeltaTs < serviceTs {
-		serviceTs = serviceDeltaTs
+	var serviceTs Timestamp
+	switch tp {
+	case tsTypeDML:
+		serviceTs = q.serviceDmTs.Load()
+	case tsTypeDelta:
+		serviceTs = q.serviceDeltaTs.Load()
 	}
-
 	return serviceTs + gracefulTime
 }
 
@@ -264,10 +284,6 @@ func (q *queryShard) search(ctx context.Context, req *querypb.SearchRequest) (*i
 	collectionID := req.Req.CollectionID
 	segmentIDs := req.SegmentIDs
 	timestamp := req.Req.TravelTimestamp
-
-	// hold request until guarantee timestamp >= service timestamp
-	guaranteeTs := req.GetReq().GetGuaranteeTimestamp()
-	q.waitUntilServiceable(ctx, guaranteeTs)
 
 	// check ctx timeout
 	if !funcutil.CheckCtxValid(ctx) {
@@ -322,127 +338,146 @@ func (q *queryShard) search(ctx context.Context, req *querypb.SearchRequest) (*i
 	searchRequests := []*searchRequest{searchReq}
 
 	if len(segmentIDs) == 0 {
-		cluster, ok := q.clusterService.getShardCluster(req.GetDmlChannel())
-		if !ok {
-			return nil, fmt.Errorf("channel %s leader is not here", req.GetDmlChannel())
-		}
-
-		// shard leader dispatches request to its shard cluster
-		results, err := cluster.Search(ctx, req)
-		if err != nil {
-			return nil, err
-		}
-		// shard leader queries its own streaming data
-		streamingResults, _, _, err := q.streaming.search(searchRequests, collectionID, req.Req.PartitionIDs, req.DmlChannel, plan, timestamp)
-		if err != nil {
-			log.Warn("search streaming data err", zap.Error(err))
-			return nil, err
-		}
-		defer deleteSearchResults(streamingResults)
-
-		if len(streamingResults) > 0 {
-			// reduce search results
-			numSegment := int64(len(streamingResults))
-			err = reduceSearchResultsAndFillData(plan, streamingResults, numSegment)
-			if err != nil {
-				return nil, err
-			}
-			marshaledHits, err := reorganizeSearchResults(streamingResults, numSegment)
-			if err != nil {
-				return nil, err
-			}
-			defer deleteMarshaledHits(marshaledHits)
-
-			// transform (hard to understand)
-			hitsBlob, err := marshaledHits.getHitsBlob()
-			if err != nil {
-				return nil, err
-			}
-
-			hitBlobSizePeerQuery, err := marshaledHits.hitBlobSizeInGroup(int64(0))
-			if err != nil {
-				return nil, err
-			}
-
-			var offset int64
-			hits := make([][]byte, len(hitBlobSizePeerQuery))
-			for i, length := range hitBlobSizePeerQuery {
-				hits[i] = hitsBlob[offset : offset+length]
-				offset += length
-			}
-
-			transformed, err := translateHits(schemaHelper, req.Req.OutputFieldsId, hits)
-			if err != nil {
-				return nil, err
-			}
-			byteBlobs, err := proto.Marshal(transformed)
-			if err != nil {
-				return nil, err
-			}
-
-			// complete results with merged streaming result
-			results = append(results, &internalpb.SearchResults{
-				Status:         &commonpb.Status{ErrorCode: commonpb.ErrorCode_Success},
-				MetricType:     plan.getMetricType(),
-				NumQueries:     queryNum,
-				TopK:           topK,
-				SlicedBlob:     byteBlobs,
-				SlicedOffset:   1,
-				SlicedNumCount: 1,
-			})
-		} else {
-			// complete results with merged streaming result
-			results = append(results, &internalpb.SearchResults{
-				Status:         &commonpb.Status{ErrorCode: commonpb.ErrorCode_Success},
-				MetricType:     plan.getMetricType(),
-				NumQueries:     queryNum,
-				TopK:           topK,
-				SlicedBlob:     nil,
-				SlicedOffset:   1,
-				SlicedNumCount: 1,
-			})
-		}
-
-		// reduce shard search results: unmarshal -> reduce -> marshal
-		log.Debug("shard leader get search results", zap.Int("numbers", len(results)))
-		searchResultData, err := decodeSearchResults(results)
-		if err != nil {
-			log.Warn("shard leader decode search results errors", zap.Error(err))
-			return nil, err
-		}
-		log.Debug("shard leader get valid search results", zap.Int("numbers", len(searchResultData)))
-
-		for i, sData := range searchResultData {
-			log.Debug("reduceSearchResultData",
-				zap.Int("result No.", i),
-				zap.Int64("nq", sData.NumQueries),
-				zap.Int64("topk", sData.TopK),
-				zap.String("ids", sData.Ids.String()),
-				zap.Any("len(FieldsData)", len(sData.FieldsData)))
-		}
-
-		reducedResultData, err := reduceSearchResultData(searchResultData, queryNum, plan.getTopK(), plan.getMetricType())
-		if err != nil {
-			log.Warn("shard leader reduce errors", zap.Error(err))
-			return nil, err
-		}
-		searchResults, err := encodeSearchResultData(reducedResultData, queryNum, plan.getTopK(), plan.getMetricType())
-		if err != nil {
-			log.Warn("shard leader encode search result errors", zap.Error(err))
-			return nil, err
-		}
-		if searchResults.SlicedBlob == nil {
-			log.Debug("shard leader send nil results to proxy",
-				zap.String("shard", q.channel))
-		} else {
-			log.Debug("shard leader send non-nil results to proxy",
-				zap.String("shard", q.channel),
-				zap.String("ids", reducedResultData.Ids.String()))
-			// printSearchResultData(reducedResultData, q.channel)
-		}
-		return searchResults, nil
+		// segmentIDs not specified, searching as shard leader
+		return q.searchLeader(ctx, req, searchRequests, collectionID, schemaHelper, plan, topK, queryNum, timestamp)
 	}
 
+	// segmentIDs specified search as shard follower
+	return q.searchFollower(ctx, req, searchRequests, collectionID, schemaHelper, plan, topK, queryNum, timestamp)
+}
+
+func (q *queryShard) searchLeader(ctx context.Context, req *querypb.SearchRequest, searchRequests []*searchRequest, collectionID UniqueID,
+	schemaHelper *typeutil.SchemaHelper, plan *SearchPlan, topK int64, queryNum int64, timestamp Timestamp) (*internalpb.SearchResults, error) {
+	cluster, ok := q.clusterService.getShardCluster(req.GetDmlChannel())
+	if !ok {
+		return nil, fmt.Errorf("channel %s leader is not here", req.GetDmlChannel())
+	}
+
+	// shard leader dispatches request to its shard cluster
+	results, err := cluster.Search(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	// hold request until guarantee timestamp >= service timestamp
+	guaranteeTs := req.GetReq().GetGuaranteeTimestamp()
+	q.waitUntilServiceable(ctx, guaranteeTs, tsTypeDML)
+	// shard leader queries its own streaming data
+	streamingResults, _, _, err := q.streaming.search(searchRequests, collectionID, req.Req.PartitionIDs, req.DmlChannel, plan, timestamp)
+	if err != nil {
+		log.Warn("search streaming data err", zap.Error(err))
+		return nil, err
+	}
+	defer deleteSearchResults(streamingResults)
+
+	if len(streamingResults) > 0 {
+		// reduce search results
+		numSegment := int64(len(streamingResults))
+		err = reduceSearchResultsAndFillData(plan, streamingResults, numSegment)
+		if err != nil {
+			return nil, err
+		}
+		marshaledHits, err := reorganizeSearchResults(streamingResults, numSegment)
+		if err != nil {
+			return nil, err
+		}
+		defer deleteMarshaledHits(marshaledHits)
+
+		// transform (hard to understand)
+		hitsBlob, err := marshaledHits.getHitsBlob()
+		if err != nil {
+			return nil, err
+		}
+
+		hitBlobSizePeerQuery, err := marshaledHits.hitBlobSizeInGroup(int64(0))
+		if err != nil {
+			return nil, err
+		}
+
+		var offset int64
+		hits := make([][]byte, len(hitBlobSizePeerQuery))
+		for i, length := range hitBlobSizePeerQuery {
+			hits[i] = hitsBlob[offset : offset+length]
+			offset += length
+		}
+
+		transformed, err := translateHits(schemaHelper, req.Req.OutputFieldsId, hits)
+		if err != nil {
+			return nil, err
+		}
+		byteBlobs, err := proto.Marshal(transformed)
+		if err != nil {
+			return nil, err
+		}
+
+		// complete results with merged streaming result
+		results = append(results, &internalpb.SearchResults{
+			Status:         &commonpb.Status{ErrorCode: commonpb.ErrorCode_Success},
+			MetricType:     plan.getMetricType(),
+			NumQueries:     queryNum,
+			TopK:           topK,
+			SlicedBlob:     byteBlobs,
+			SlicedOffset:   1,
+			SlicedNumCount: 1,
+		})
+	} else {
+		// complete results with merged streaming result
+		results = append(results, &internalpb.SearchResults{
+			Status:         &commonpb.Status{ErrorCode: commonpb.ErrorCode_Success},
+			MetricType:     plan.getMetricType(),
+			NumQueries:     queryNum,
+			TopK:           topK,
+			SlicedBlob:     nil,
+			SlicedOffset:   1,
+			SlicedNumCount: 1,
+		})
+	}
+
+	// reduce shard search results: unmarshal -> reduce -> marshal
+	log.Debug("shard leader get search results", zap.Int("numbers", len(results)))
+	searchResultData, err := decodeSearchResults(results)
+	if err != nil {
+		log.Warn("shard leader decode search results errors", zap.Error(err))
+		return nil, err
+	}
+	log.Debug("shard leader get valid search results", zap.Int("numbers", len(searchResultData)))
+
+	for i, sData := range searchResultData {
+		log.Debug("reduceSearchResultData",
+			zap.Int("result No.", i),
+			zap.Int64("nq", sData.NumQueries),
+			zap.Int64("topk", sData.TopK),
+			zap.String("ids", sData.Ids.String()),
+			zap.Any("len(FieldsData)", len(sData.FieldsData)))
+	}
+
+	reducedResultData, err := reduceSearchResultData(searchResultData, queryNum, plan.getTopK(), plan.getMetricType())
+	if err != nil {
+		log.Warn("shard leader reduce errors", zap.Error(err))
+		return nil, err
+	}
+	searchResults, err := encodeSearchResultData(reducedResultData, queryNum, plan.getTopK(), plan.getMetricType())
+	if err != nil {
+		log.Warn("shard leader encode search result errors", zap.Error(err))
+		return nil, err
+	}
+	if searchResults.SlicedBlob == nil {
+		log.Debug("shard leader send nil results to proxy",
+			zap.String("shard", q.channel))
+	} else {
+		log.Debug("shard leader send non-nil results to proxy",
+			zap.String("shard", q.channel),
+			zap.String("ids", reducedResultData.Ids.String()))
+		// printSearchResultData(reducedResultData, q.channel)
+	}
+	return searchResults, nil
+}
+
+func (q *queryShard) searchFollower(ctx context.Context, req *querypb.SearchRequest, searchRequests []*searchRequest, collectionID UniqueID,
+	schemaHelper *typeutil.SchemaHelper, plan *SearchPlan, topK int64, queryNum int64, timestamp Timestamp) (*internalpb.SearchResults, error) {
+	segmentIDs := req.GetSegmentIDs()
+	// hold request until guarantee timestamp >= service timestamp
+	guaranteeTs := req.GetReq().GetGuaranteeTimestamp()
+	q.waitUntilServiceable(ctx, guaranteeTs, tsTypeDelta)
 	// search each segments by segment IDs in request
 	searchResults, _, err := q.historical.searchSegments(segmentIDs, searchRequests, plan, timestamp)
 	if err != nil {
@@ -500,6 +535,7 @@ func (q *queryShard) search(ctx context.Context, req *querypb.SearchRequest) (*i
 	}
 	log.Debug("shard follower send search result to leader")
 	return resp, nil
+
 }
 
 func reduceSearchResultData(searchResultData []*schemapb.SearchResultData, nq int64, topk int64, metricType string) (*schemapb.SearchResultData, error) {
@@ -663,10 +699,6 @@ func (q *queryShard) query(ctx context.Context, req *querypb.QueryRequest) (*int
 	expr := req.Req.SerializedExprPlan
 	timestamp := req.Req.TravelTimestamp
 
-	// hold request until guarantee timestamp >= service timestamp
-	guaranteeTs := req.GetReq().GetGuaranteeTimestamp()
-	q.waitUntilServiceable(ctx, guaranteeTs)
-
 	// check ctx timeout
 	if !funcutil.CheckCtxValid(ctx) {
 		return nil, errors.New("search context timeout")
@@ -703,6 +735,7 @@ func (q *queryShard) query(ctx context.Context, req *querypb.QueryRequest) (*int
 
 	// check if shard leader b.c only leader receives request with no segment specified
 	if len(req.GetSegmentIDs()) == 0 {
+
 		cluster, ok := q.clusterService.getShardCluster(req.GetDmlChannel())
 		if !ok {
 			return nil, fmt.Errorf("channel %s leader is not here", req.GetDmlChannel())
@@ -713,6 +746,9 @@ func (q *queryShard) query(ctx context.Context, req *querypb.QueryRequest) (*int
 		if err != nil {
 			return nil, err
 		}
+		// hold request until guarantee timestamp >= service timestamp
+		guaranteeTs := req.GetReq().GetGuaranteeTimestamp()
+		q.waitUntilServiceable(ctx, guaranteeTs, tsTypeDML)
 		// shard leader queries its own streaming data
 		// TODO: filter stream retrieve results by channel
 		streamingResults, _, _, err := q.streaming.retrieve(collectionID, partitionIDs, plan)
@@ -735,6 +771,9 @@ func (q *queryShard) query(ctx context.Context, req *querypb.QueryRequest) (*int
 		return mergedResults, err
 	}
 
+	// hold request until guarantee timestamp >= service timestamp
+	guaranteeTs := req.GetReq().GetGuaranteeTimestamp()
+	q.waitUntilServiceable(ctx, guaranteeTs, tsTypeDelta)
 	// shard follower considers solely historical segments
 	retrieveResults, err := q.historical.retrieveBySegmentIDs(collectionID, segmentIDs, q.vectorChunkManager, plan)
 	if err != nil {
