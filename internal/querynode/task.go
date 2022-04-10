@@ -463,18 +463,23 @@ func (w *watchDmChannelsTask) Execute(ctx context.Context) error {
 		w.node.tSafeReplica.addTSafe(channel)
 	}
 
-	/*
-		// add tSafe watcher if queryCollection exists
-		qc, err := w.node.queryService.getQueryCollection(collectionID)
-		if err == nil {
-			for _, channel := range vChannels {
-				err = qc.addTSafeWatcher(channel)
-				if err != nil {
-					// tSafe have been exist, not error
-					log.Warn(err.Error())
-				}
-			}
-		}*/
+	// add tsafe watch in query shard if exists
+	for _, dmlChannel := range vChannels {
+		if !w.node.queryShardService.hasQueryShard(dmlChannel) {
+			//TODO add replica id in req
+			w.node.queryShardService.addQueryShard(collectionID, dmlChannel, 0)
+		}
+
+		qs, err := w.node.queryShardService.getQueryShard(dmlChannel)
+		if err != nil {
+			log.Warn("failed to get query shard", zap.String("dmlChannel", dmlChannel), zap.Error(err))
+			continue
+		}
+		err = qs.watchDMLTSafe()
+		if err != nil {
+			log.Warn("failed to start query shard watch dml tsafe", zap.Error(err))
+		}
+	}
 
 	// start flow graphs
 	for _, fg := range channel2FlowGraph {
@@ -602,18 +607,28 @@ func (w *watchDeltaChannelsTask) Execute(ctx context.Context) error {
 		w.node.tSafeReplica.addTSafe(channel)
 	}
 
-	/*
-		// add tSafe watcher if queryCollection exists
-		qc, err := w.node.queryService.getQueryCollection(collectionID)
-		if err == nil {
-			for _, channel := range vDeltaChannels {
-				err = qc.addTSafeWatcher(channel)
-				if err != nil {
-					// tSafe have been existed, not error
-					log.Warn(err.Error())
-				}
-			}
-		}*/
+	// add tsafe watch in query shard if exists
+	for _, channel := range vDeltaChannels {
+		dmlChannel, err := funcutil.ConvertChannelName(channel, Params.CommonCfg.RootCoordDelta, Params.CommonCfg.RootCoordDml)
+		if err != nil {
+			log.Warn("failed to convert delta channel to dml", zap.String("channel", channel), zap.Error(err))
+			continue
+		}
+		if !w.node.queryShardService.hasQueryShard(dmlChannel) {
+			//TODO add replica id in req
+			w.node.queryShardService.addQueryShard(collectionID, dmlChannel, 0)
+		}
+
+		qs, err := w.node.queryShardService.getQueryShard(dmlChannel)
+		if err != nil {
+			log.Warn("failed to get query shard", zap.String("dmlChannel", dmlChannel), zap.Error(err))
+			continue
+		}
+		err = qs.watchDeltaTSafe()
+		if err != nil {
+			log.Warn("failed to start query shard watch delta tsafe", zap.Error(err))
+		}
+	}
 
 	// start flow graphs
 	for _, fg := range channel2FlowGraph {
