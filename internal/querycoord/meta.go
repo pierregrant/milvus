@@ -1058,6 +1058,7 @@ func (m *MetaReplica) setLoadPercentage(collectionID UniqueID, partitionID Uniqu
 		}
 	} else {
 		findPartition := false
+		info.InMemoryPercentage = 0
 		for _, partitionState := range info.PartitionStates {
 			if partitionState.PartitionID == partitionID {
 				findPartition = true
@@ -1067,15 +1068,18 @@ func (m *MetaReplica) setLoadPercentage(collectionID UniqueID, partitionID Uniqu
 					partitionState.State = querypb.PartitionState_PartialInMemory
 				}
 				partitionState.InMemoryPercentage = percentage
-				err := saveGlobalCollectionInfo(collectionID, info, m.client)
-				if err != nil {
-					log.Error("save collectionInfo error", zap.Any("error", err.Error()), zap.Int64("collectionID", collectionID))
-					return err
-				}
 			}
+			info.InMemoryPercentage += partitionState.InMemoryPercentage
 		}
 		if !findPartition {
 			return errors.New("setLoadPercentage: can't find partitionID in collectionInfos")
+		}
+
+		info.InMemoryPercentage /= int64(len(info.PartitionIDs))
+		err := saveGlobalCollectionInfo(collectionID, info, m.client)
+		if err != nil {
+			log.Error("save collectionInfo error", zap.Any("error", err.Error()), zap.Int64("collectionID", collectionID))
+			return err
 		}
 	}
 
