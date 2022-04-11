@@ -68,10 +68,11 @@ type nodeEvent struct {
 }
 
 type segmentEvent struct {
-	eventType segmentEventType
-	segmentID int64
-	nodeID    int64
-	state     segmentState
+	eventType   segmentEventType
+	segmentID   int64
+	partitionID int64
+	nodeID      int64
+	state       segmentState
 }
 
 type shardQueryNode interface {
@@ -87,9 +88,10 @@ type shardNode struct {
 }
 
 type shardSegmentInfo struct {
-	segmentID int64
-	nodeID    int64
-	state     segmentState
+	segmentID   int64
+	partitionID int64
+	nodeID      int64
+	state       segmentState
 }
 
 // ShardNodeDetector provides method to detect node events
@@ -211,9 +213,10 @@ func (sc *ShardCluster) updateSegment(evt segmentEvent) {
 	old, ok := sc.segments[evt.segmentID]
 	if !ok { // newly add
 		sc.segments[evt.segmentID] = &shardSegmentInfo{
-			nodeID:    evt.nodeID,
-			segmentID: evt.segmentID,
-			state:     evt.state,
+			nodeID:      evt.nodeID,
+			partitionID: evt.partitionID,
+			segmentID:   evt.segmentID,
+			state:       evt.state,
 		}
 		return
 	}
@@ -370,19 +373,23 @@ func (sc *ShardCluster) getSegment(segmentID int64) (*shardSegmentInfo, bool) {
 		return nil, false
 	}
 	return &shardSegmentInfo{
-		segmentID: segment.segmentID,
-		nodeID:    segment.nodeID,
-		state:     segment.state,
+		segmentID:   segment.segmentID,
+		nodeID:      segment.nodeID,
+		partitionID: segment.partitionID,
+		state:       segment.state,
 	}, true
 }
 
 // segmentAllocations returns node to segments mappings.
-func (sc *ShardCluster) segmentAllocations() map[int64][]int64 {
+func (sc *ShardCluster) segmentAllocations(partitionIDs []int64) map[int64][]int64 {
 	result := make(map[int64][]int64) // nodeID => segmentIDs
 	sc.mut.RLock()
 	defer sc.mut.RUnlock()
 
 	for _, segment := range sc.segments {
+		if len(partitionIDs) > 0 && !inList(partitionIDs, segment.partitionID) {
+			continue
+		}
 		result[segment.nodeID] = append(result[segment.nodeID], segment.segmentID)
 	}
 	return result
@@ -398,8 +405,10 @@ func (sc *ShardCluster) Search(ctx context.Context, req *querypb.SearchRequest) 
 		return nil, fmt.Errorf("ShardCluster for %s does not match to request channel :%s", sc.vchannelName, req.GetDmlChannel())
 	}
 
+	//req.GetReq().GetPartitionIDs()
+
 	// get node allocation
-	segAllocs := sc.segmentAllocations()
+	segAllocs := sc.segmentAllocations(req.GetReq().GetPartitionIDs())
 
 	log.Debug("cluster segment distribution", zap.Int("len", len(segAllocs)))
 	for nodeID, segmentIDs := range segAllocs {
@@ -458,7 +467,7 @@ func (sc *ShardCluster) Query(ctx context.Context, req *querypb.QueryRequest) ([
 	}
 
 	// get node allocation
-	segAllocs := sc.segmentAllocations()
+	segAllocs := sc.segmentAllocations(req.GetReq().GetPartitionIDs())
 
 	// TODO dispatch to local queryShardService query dml channel growing segments
 

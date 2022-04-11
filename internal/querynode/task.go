@@ -131,68 +131,34 @@ func (r *addQueryChannelTask) Execute(ctx context.Context) error {
 	log.Debug("Execute addQueryChannelTask",
 		zap.Any("collectionID", r.req.CollectionID))
 
+	collectionID := r.req.CollectionID
+	if r.node.queryShardService == nil {
+		return fmt.Errorf("null query shard service, collectionID %d", collectionID)
+	}
+
+	qc := r.node.queryShardService.getQueryChannel(collectionID)
+	log.Debug("add query channel for collection", zap.Int64("collectionID", collectionID))
+
+	consumeSubName := funcutil.GenChannelSubName(Params.CommonCfg.QueryNodeSubName, collectionID, Params.QueryNodeCfg.QueryNodeID)
+
+	err := qc.AsConsumer(r.req.QueryChannel, consumeSubName, r.req.SeekPosition)
+	if err != nil {
+		log.Warn("query channel as consumer failed", zap.Int64("collectionID", collectionID), zap.String("channel", r.req.QueryChannel), zap.Error(err))
+		return err
+	}
+
+	// init global sealed segments
 	/*
-			collectionID := r.req.CollectionID
-			if r.node.queryService == nil {
-				errMsg := "null query service, collectionID = " + fmt.Sprintln(collectionID)
-				return errors.New(errMsg)
-			}
-
-			if r.node.queryService.hasQueryCollection(collectionID) {
-				log.Debug("queryCollection has been existed when addQueryChannel",
-					zap.Any("collectionID", collectionID),
-				)
-				return nil
-			}
-
-			// add search collection
-			err := r.node.queryService.addQueryCollection(collectionID)
-			if err != nil {
-				return err
-			}
-			log.Debug("add query collection", zap.Any("collectionID", collectionID))
-
-			// add request channel
-			sc, err := r.node.queryService.getQueryCollection(collectionID)
-			if err != nil {
-				return err
-			}
-		consumeChannels := []string{r.req.QueryChannel}
-		consumeSubName := funcutil.GenChannelSubName(Params.CommonCfg.QueryNodeSubName, collectionID, Params.QueryNodeCfg.QueryNodeID)
-
-		sc.queryMsgStream.AsConsumer(consumeChannels, consumeSubName)
-		metrics.QueryNodeNumConsumers.WithLabelValues(fmt.Sprint(Params.QueryNodeCfg.QueryNodeID)).Inc()
-		if r.req.SeekPosition == nil || len(r.req.SeekPosition.MsgID) == 0 {
-			// as consumer
-			log.Debug("QueryNode AsConsumer", zap.Strings("channels", consumeChannels), zap.String("sub name", consumeSubName))
-		} else {
-			// seek query channel
-			err = sc.queryMsgStream.Seek([]*internalpb.MsgPosition{r.req.SeekPosition})
-			if err != nil {
-				return err
-			}
-			log.Debug("querynode seek query channel: ", zap.Any("consumeChannels", consumeChannels),
-				zap.String("seek position", string(r.req.SeekPosition.MsgID)))
-		}
-
-		// add result channel
-		// producerChannels := []string{r.req.QueryResultChannel}
-		// sc.queryResultMsgStream.AsProducer(producerChannels)
-		// log.Debug("QueryNode AsProducer", zap.Strings("channels", producerChannels))
-
-		// init global sealed segments
 		for _, segment := range r.req.GlobalSealedSegments {
 			sc.globalSegmentManager.addGlobalSegmentInfo(segment)
-		}
+		}*/
 
-		// start queryCollection, message stream need to asConsumer before start
-		sc.start()
-		log.Debug("start query collection", zap.Any("collectionID", collectionID))
+	qc.Start()
+	log.Debug("start query channel", zap.Int64("collectionID", collectionID))
 
-		log.Debug("addQueryChannelTask done",
-			zap.Any("collectionID", r.req.CollectionID),
-		)
-	*/
+	log.Debug("addQueryChannelTask done",
+		zap.Any("collectionID", r.req.CollectionID),
+	)
 	return nil
 }
 
@@ -736,12 +702,8 @@ func (r *releaseCollectionTask) Execute(ctx context.Context) error {
 		zap.Any("collectionID", r.req.CollectionID),
 	)
 
-	/*
-		// remove query collection
-		// queryCollection and Collection would be deleted in releaseCollection,
-		// so we don't need to remove the tSafeWatcher or channel manually.
-		r.node.queryService.stopQueryCollection(r.req.CollectionID)
-	*/
+	r.node.queryShardService.releaseCollection(r.req.CollectionID)
+
 	err := r.releaseReplica(r.node.streaming.replica, replicaStreaming)
 	if err != nil {
 		return fmt.Errorf("release collection failed, collectionID = %d, err = %s", r.req.CollectionID, err)

@@ -106,6 +106,11 @@ func newQueryShard(
 	return qs
 }
 
+// Close cleans query shard
+func (q *queryShard) Close() {
+	q.cancel()
+}
+
 func (q *queryShard) watchDMLTSafe() error {
 	q.dmTSafeWatcher = newTSafeWatcher()
 	err := q.streaming.tSafeReplica.registerTSafeWatcher(q.channel, q.dmTSafeWatcher)

@@ -94,10 +94,11 @@ func (sd *etcdShardSegmentDetector) watchSegments(collectionID int64, replicaID 
 
 		if inList(info.GetReplicaIds(), replicaID) {
 			events = append(events, segmentEvent{
-				eventType: segmentAdd,
-				segmentID: info.GetSegmentID(),
-				nodeID:    info.GetNodeID(),
-				state:     segmentStateLoaded,
+				eventType:   segmentAdd,
+				segmentID:   info.GetSegmentID(),
+				partitionID: info.GetPartitionID(),
+				nodeID:      info.GetNodeID(),
+				state:       segmentStateLoaded,
 			})
 		}
 	}
@@ -156,10 +157,11 @@ func (sd *etcdShardSegmentDetector) handlePutEvent(e *clientv3.Event, collection
 	}
 
 	sd.evtCh <- segmentEvent{
-		eventType: segmentAdd,
-		segmentID: info.GetSegmentID(),
-		nodeID:    info.GetNodeID(),
-		state:     segmentStateLoaded,
+		eventType:   segmentAdd,
+		segmentID:   info.GetSegmentID(),
+		partitionID: info.GetPartitionID(),
+		nodeID:      info.GetNodeID(),
+		state:       segmentStateLoaded,
 	}
 }
 
@@ -179,10 +181,11 @@ func (sd *etcdShardSegmentDetector) handleDelEvent(e *clientv3.Event, collection
 	}
 
 	sd.evtCh <- segmentEvent{
-		eventType: segmentDel,
-		segmentID: info.GetSegmentID(),
-		nodeID:    info.GetNodeID(),
-		state:     segmentStateOffline,
+		eventType:   segmentDel,
+		segmentID:   info.GetSegmentID(),
+		partitionID: info.GetPartitionID(),
+		nodeID:      info.GetNodeID(),
+		state:       segmentStateOffline,
 	}
 }
 

@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/milvus-io/milvus/internal/mq/msgstream"
 	"github.com/milvus-io/milvus/internal/storage"
 )
 
@@ -33,6 +34,11 @@ type queryShardService struct {
 	queryShardsMu sync.Mutex              // guards queryShards
 	queryShards   map[Channel]*queryShard // Virtual Channel -> *queryShard
 
+	queryChannelMu sync.Mutex              // guards queryChannels
+	queryChannels  map[int64]*queryChannel // Collection ID -> query channel
+
+	factory msgstream.Factory
+
 	historical *historical
 	streaming  *streaming
 
@@ -42,7 +48,7 @@ type queryShardService struct {
 	localCacheEnabled   bool
 }
 
-func newQueryShardService(ctx context.Context, historical *historical, streaming *streaming, clusterService *ShardClusterService) *queryShardService {
+func newQueryShardService(ctx context.Context, historical *historical, streaming *streaming, clusterService *ShardClusterService, factory msgstream.Factory) *queryShardService {
 	queryShardServiceCtx, queryShardServiceCancel := context.WithCancel(ctx)
 
 	path := Params.LoadWithDefault("localStorage.Path", "/tmp/milvus/data")
@@ -62,12 +68,14 @@ func newQueryShardService(ctx context.Context, historical *historical, streaming
 		ctx:                 queryShardServiceCtx,
 		cancel:              queryShardServiceCancel,
 		queryShards:         make(map[Channel]*queryShard),
+		queryChannels:       make(map[int64]*queryChannel),
 		historical:          historical,
 		streaming:           streaming,
 		shardClusterService: clusterService,
 		localChunkManager:   localChunkManager,
 		remoteChunkManager:  remoteChunkManager,
 		localCacheEnabled:   localCacheEnabled,
+		factory:             factory,
 	}
 	return qss
 }
@@ -126,7 +134,43 @@ func (q *queryShardService) close() {
 	defer q.queryShardsMu.Unlock()
 
 	for _, queryShard := range q.queryShards {
-		//TODO change to query shard close function
-		queryShard.cancel()
+		queryShard.Close()
 	}
+}
+
+func (q *queryShardService) getQueryChannel(collectionID int64) *queryChannel {
+	q.queryChannelMu.Lock()
+	defer q.queryChannelMu.Unlock()
+
+	qc, ok := q.queryChannels[collectionID]
+	if !ok {
+		queryStream, _ := q.factory.NewQueryMsgStream(q.ctx)
+		qc = &queryChannel{
+			closeCh:        make(chan struct{}),
+			collectionID:   collectionID,
+			queryMsgStream: queryStream,
+			streaming:      q.streaming,
+		}
+		q.queryChannels[collectionID] = qc
+	}
+
+	return qc
+}
+
+func (q *queryShardService) releaseCollection(collectionID int64) {
+	q.queryChannelMu.Lock()
+	qc, ok := q.queryChannels[collectionID]
+	if ok && qc != nil {
+		qc.Stop()
+	}
+	q.queryChannelMu.Unlock()
+
+	q.queryShardsMu.Lock()
+	for _, queryShard := range q.queryShards {
+		if queryShard.collectionID == collectionID {
+			queryShard.Close()
+			delete(q.queryShards, queryShard.channel)
+		}
+	}
+	q.queryShardsMu.Unlock()
 }
