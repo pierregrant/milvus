@@ -13,7 +13,7 @@ func TestShardClusterService(t *testing.T) {
 	client := v3client.New(embedetcdServer.Server)
 	defer client.Close()
 	session := sessionutil.NewSession(context.Background(), "/by-dev/sessions/unittest/querynode/", client)
-	clusterService := newShardClusterService(client, session)
+	clusterService := newShardClusterService(client, session, nil)
 
 	assert.NotPanics(t, func() {
 		clusterService.addShardCluster(defaultCollectionID, defaultReplicaID, defaultDMLChannel)

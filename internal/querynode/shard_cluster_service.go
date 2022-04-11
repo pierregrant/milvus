@@ -18,17 +18,27 @@ const (
 	ReplicaMetaPrefix = "queryCoord-ReplicaMeta"
 )
 
+// shardQueryNodeWrapper wraps a querynode to shardQueryNode and preventing it been closed
+type shardQueryNodeWrapper struct {
+	*QueryNode
+}
+
+// Stop overrides default close method
+func (w *shardQueryNodeWrapper) Stop() error { return nil }
+
 // ShardClusterService maintains the online ShardCluster(leader) in this querynode.
 type ShardClusterService struct {
 	client  *clientv3.Client // etcd client for detectors
 	session *sessionutil.Session
+	node    *QueryNode
 
 	clusters sync.Map // channel name => *shardCluster
 }
 
 // newShardClusterService returns a new shardClusterService
-func newShardClusterService(client *clientv3.Client, session *sessionutil.Session) *ShardClusterService {
+func newShardClusterService(client *clientv3.Client, session *sessionutil.Session, node *QueryNode) *ShardClusterService {
 	return &ShardClusterService{
+		node:     node,
 		session:  session,
 		client:   client,
 		clusters: sync.Map{},
@@ -54,6 +64,10 @@ func (s *ShardClusterService) addShardCluster(collectionID, replicaID int64, vch
 
 	cs := NewShardCluster(collectionID, replicaID, vchannelName, nodeDetector, segmentDetector,
 		func(nodeID int64, addr string) shardQueryNode {
+			if nodeID == s.session.ServerID {
+				// wrap node itself
+				return &shardQueryNodeWrapper{QueryNode: s.node}
+			}
 			ctx := context.Background()
 			qn, _ := grpcquerynodeclient.NewClient(ctx, addr)
 			return qn
@@ -81,4 +95,15 @@ func (s *ShardClusterService) releaseShardCluster(vchannelName string) error {
 	cs := raw.(*ShardCluster)
 	cs.Close()
 	return nil
+}
+
+// releaseCollection removes all shardCluster matching specified collectionID
+func (s *ShardClusterService) releaseCollection(collectionID int64) {
+	s.clusters.Range(func(k, v interface{}) bool {
+		cs := v.(*ShardCluster)
+		if cs.collectionID == collectionID {
+			s.releaseShardCluster(k.(string))
+		}
+		return true
+	})
 }

@@ -3045,7 +3045,7 @@ func (node *Proxy) CalcDistance(ctx context.Context, request *milvuspb.CalcDista
 			OutputFields:   outputFields,
 		}
 
-		qt := &queryTask{
+		qt := &queryTaskV2{
 			ctx:       ctx,
 			Condition: NewTaskCondition(ctx),
 			RetrieveRequest: &internalpb.RetrieveRequest{
@@ -3055,11 +3055,10 @@ func (node *Proxy) CalcDistance(ctx context.Context, request *milvuspb.CalcDista
 				},
 				ResultChannelID: strconv.FormatInt(Params.ProxyCfg.ProxyID, 10),
 			},
-			resultBuf: make(chan []*internalpb.RetrieveResults),
-			query:     queryRequest,
-			chMgr:     node.chMgr,
-			qc:        node.queryCoord,
-			ids:       ids.IdArray,
+			request:            queryRequest,
+			getQueryNodePolicy: defaultGetQueryNodePolicy,
+			qc:                 node.queryCoord,
+			ids:                ids.IdArray,
 		}
 
 		err := node.sched.dqQueue.Enqueue(qt)

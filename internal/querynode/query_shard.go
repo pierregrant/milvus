@@ -295,16 +295,17 @@ func (q *queryShard) search(ctx context.Context, req *querypb.SearchRequest) (*i
 		return nil, errors.New("search context timeout")
 	}
 
-	q.historical.replica.queryRLock()
-	q.streaming.replica.queryRLock()
-	defer q.historical.replica.queryRUnlock()
-	defer q.streaming.replica.queryRUnlock()
-
-	// deserialize query plan
+	// check if collection has been released
 	collection, err := q.historical.replica.getCollectionByID(collectionID)
 	if err != nil {
 		return nil, err
 	}
+	if req.GetReq().GetGuaranteeTimestamp() >= collection.getReleaseTime() {
+		log.Warn("collection release before search", zap.Int64("collectionID", collectionID))
+		return nil, fmt.Errorf("retrieve failed, collection has been released, collectionID = %d", collectionID)
+	}
+
+	// deserialize query plan
 
 	var plan *SearchPlan
 	if req.Req.GetDslType() == commonpb.DslType_BoolExprV1 {
@@ -353,6 +354,8 @@ func (q *queryShard) search(ctx context.Context, req *querypb.SearchRequest) (*i
 
 func (q *queryShard) searchLeader(ctx context.Context, req *querypb.SearchRequest, searchRequests []*searchRequest, collectionID UniqueID,
 	schemaHelper *typeutil.SchemaHelper, plan *SearchPlan, topK int64, queryNum int64, timestamp Timestamp) (*internalpb.SearchResults, error) {
+	q.streaming.replica.queryRLock()
+	defer q.streaming.replica.queryRUnlock()
 	cluster, ok := q.clusterService.getShardCluster(req.GetDmlChannel())
 	if !ok {
 		return nil, fmt.Errorf("channel %s leader is not here", req.GetDmlChannel())
@@ -479,6 +482,8 @@ func (q *queryShard) searchLeader(ctx context.Context, req *querypb.SearchReques
 
 func (q *queryShard) searchFollower(ctx context.Context, req *querypb.SearchRequest, searchRequests []*searchRequest, collectionID UniqueID,
 	schemaHelper *typeutil.SchemaHelper, plan *SearchPlan, topK int64, queryNum int64, timestamp Timestamp) (*internalpb.SearchResults, error) {
+	q.historical.replica.queryRLock()
+	defer q.historical.replica.queryRUnlock()
 	segmentIDs := req.GetSegmentIDs()
 	// hold request until guarantee timestamp >= service timestamp
 	guaranteeTs := req.GetReq().GetGuaranteeTimestamp()
@@ -709,11 +714,17 @@ func (q *queryShard) query(ctx context.Context, req *querypb.QueryRequest) (*int
 		return nil, errors.New("search context timeout")
 	}
 
-	// deserialize query plan
+	// check if collection has been released
 	collection, err := q.streaming.replica.getCollectionByID(collectionID)
 	if err != nil {
 		return nil, err
 	}
+
+	if req.GetReq().GetGuaranteeTimestamp() >= collection.getReleaseTime() {
+		log.Warn("collection release before query", zap.Int64("collectionID", collectionID))
+		return nil, fmt.Errorf("retrieve failed, collection has been released, collectionID = %d", collectionID)
+	}
+	// deserialize query plan
 	plan, err := createRetrievePlanByExpr(collection, expr, timestamp)
 	if err != nil {
 		return nil, err
@@ -740,7 +751,8 @@ func (q *queryShard) query(ctx context.Context, req *querypb.QueryRequest) (*int
 
 	// check if shard leader b.c only leader receives request with no segment specified
 	if len(req.GetSegmentIDs()) == 0 {
-
+		q.streaming.replica.queryRLock()
+		defer q.streaming.replica.queryRUnlock()
 		cluster, ok := q.clusterService.getShardCluster(req.GetDmlChannel())
 		if !ok {
 			return nil, fmt.Errorf("channel %s leader is not here", req.GetDmlChannel())
@@ -775,7 +787,8 @@ func (q *queryShard) query(ctx context.Context, req *querypb.QueryRequest) (*int
 		log.Debug("leader retrieve result", zap.String("channel", req.DmlChannel), zap.String("ids", mergedResults.Ids.String()))
 		return mergedResults, err
 	}
-
+	q.historical.replica.queryRLock()
+	defer q.historical.replica.queryRUnlock()
 	// hold request until guarantee timestamp >= service timestamp
 	guaranteeTs := req.GetReq().GetGuaranteeTimestamp()
 	q.waitUntilServiceable(ctx, guaranteeTs, tsTypeDelta)
