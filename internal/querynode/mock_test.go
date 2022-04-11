@@ -1728,7 +1728,7 @@ func genSimpleQueryNodeWithMQFactory(ctx context.Context, fac msgstream.Factory)
 		node.queryService = qs*/
 
 	// init shard cluster service
-	node.ShardClusterService = newShardClusterService(node.etcdCli, node.session)
+	node.ShardClusterService = newShardClusterService(node.etcdCli, node.session, node)
 
 	node.queryShardService = newQueryShardService(node.queryNodeLoopCtx, node.historical, node.streaming, node.ShardClusterService, node.msFactory)
 

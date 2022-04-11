@@ -703,6 +703,7 @@ func (r *releaseCollectionTask) Execute(ctx context.Context) error {
 	)
 
 	r.node.queryShardService.releaseCollection(r.req.CollectionID)
+	r.node.queryShardService.releaseCollection(r.req.CollectionID)
 
 	err := r.releaseReplica(r.node.streaming.replica, replicaStreaming)
 	if err != nil {
