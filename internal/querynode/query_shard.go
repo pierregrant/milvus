@@ -513,13 +513,15 @@ func (q *queryShard) searchFollower(ctx context.Context, req *querypb.SearchRequ
 	if err != nil {
 		log.Warn("getSearchResultDataBlob for historical results error", zap.Error(err))
 	}
+	bs := make([]byte, len(blob))
+	copy(bs, blob)
 
 	resp := &internalpb.SearchResults{
 		Status:         &commonpb.Status{ErrorCode: commonpb.ErrorCode_Success},
 		MetricType:     plan.getMetricType(),
 		NumQueries:     queryNum,
 		TopK:           topK,
-		SlicedBlob:     blob,
+		SlicedBlob:     bs,
 		SlicedOffset:   1,
 		SlicedNumCount: 1,
 	}
