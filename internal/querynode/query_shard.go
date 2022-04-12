@@ -141,7 +141,7 @@ func (q *queryShard) watchDeltaTSafe() error {
 func (q *queryShard) startTsTicker() {
 	q.startTickerOnce.Do(func() {
 		go func() {
-			q.ticker = time.NewTicker(time.Millisecond * 10) // check timeout every 10 milliseconds
+			q.ticker = time.NewTicker(time.Millisecond * 50) // check timeout every 50 milliseconds, need not to be to frequent
 			defer q.ticker.Stop()
 			for {
 				select {
@@ -231,15 +231,15 @@ func (q *queryShard) waitUntilServiceable(ctx context.Context, guaranteeTs Times
 	defer q.watcherCond.L.Unlock()
 	st := q.getServiceableTime(tp)
 	for guaranteeTs > st {
-		log.Debug("serviceable ts before guarantee ts", zap.Uint64("serviceable ts", st), zap.Uint64("guarantee ts", guaranteeTs))
+		log.Debug("serviceable ts before guarantee ts", zap.Uint64("serviceable ts", st), zap.Uint64("guarantee ts", guaranteeTs), zap.String("channel", q.channel))
 		q.watcherCond.Wait()
 		if err := ctx.Err(); err != nil {
-			log.Warn("waitUntialServiceable timeout", zap.Uint64("serviceable ts", st), zap.Uint64("guarantee ts", guaranteeTs))
+			log.Warn("waitUntialServiceable timeout", zap.Uint64("serviceable ts", st), zap.Uint64("guarantee ts", guaranteeTs), zap.String("channel", q.channel))
 			return
 		}
 		st = q.getServiceableTime(tp)
 	}
-	log.Debug("wait serviceable ts done", zap.String("tsType", tp.String()), zap.Uint64("guarantee ts", guaranteeTs), zap.Uint64("serviceable ts", st))
+	log.Debug("wait serviceable ts done", zap.String("tsType", tp.String()), zap.Uint64("guarantee ts", guaranteeTs), zap.Uint64("serviceable ts", st), zap.String("channel", q.channel))
 }
 
 func (q *queryShard) getServiceableTime(tp tsType) Timestamp {
@@ -250,9 +250,9 @@ func (q *queryShard) getServiceableTime(tp tsType) Timestamp {
 	}
 	var serviceTs Timestamp
 	switch tp {
-	case tsTypeDML:
+	case tsTypeDML: // use min value of dml & delta
 		serviceTs = q.serviceDmTs.Load()
-	case tsTypeDelta:
+	case tsTypeDelta: // check delta ts only
 		serviceTs = q.serviceDeltaTs.Load()
 	}
 	return serviceTs + gracefulTime
@@ -724,6 +724,7 @@ func (q *queryShard) query(ctx context.Context, req *querypb.QueryRequest) (*int
 		log.Warn("collection release before query", zap.Int64("collectionID", collectionID))
 		return nil, fmt.Errorf("retrieve failed, collection has been released, collectionID = %d", collectionID)
 	}
+	log.Debug("CQX query ts", zap.Uint64("travel ts", req.GetReq().GetTravelTimestamp()), zap.Uint64("guarantee ts", req.GetReq().GetGuaranteeTimestamp()))
 	// deserialize query plan
 	plan, err := createRetrievePlanByExpr(collection, expr, timestamp)
 	if err != nil {
@@ -768,7 +769,7 @@ func (q *queryShard) query(ctx context.Context, req *querypb.QueryRequest) (*int
 		q.waitUntilServiceable(ctx, guaranteeTs, tsTypeDML)
 		// shard leader queries its own streaming data
 		// TODO: filter stream retrieve results by channel
-		streamingResults, _, _, err := q.streaming.retrieve(collectionID, partitionIDs, plan)
+		streamingResults, _, _, err := q.streaming.retrieve(collectionID, partitionIDs, plan, func(segment *Segment) bool { return segment.vChannelID == q.channel })
 		if err != nil {
 			return nil, err
 		}
