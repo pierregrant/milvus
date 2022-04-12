@@ -39,6 +39,7 @@ import (
 	"github.com/milvus-io/milvus/internal/proto/querypb"
 	"github.com/milvus-io/milvus/internal/proto/schemapb"
 	"github.com/milvus-io/milvus/internal/util"
+	"github.com/milvus-io/milvus/internal/util/dependency"
 	"github.com/milvus-io/milvus/internal/util/funcutil"
 )
 
@@ -107,7 +108,7 @@ type MetaReplica struct {
 	ctx         context.Context
 	cancel      context.CancelFunc
 	client      kv.MetaKv // client of a reliable kv service, i.e. etcd client
-	msFactory   msgstream.Factory
+	factory     dependency.Factory
 	idAllocator func() (UniqueID, error)
 
 	//sync.RWMutex
@@ -127,7 +128,7 @@ type MetaReplica struct {
 	replicas *ReplicaInfos
 }
 
-func newMeta(ctx context.Context, kv kv.MetaKv, factory msgstream.Factory, idAllocator func() (UniqueID, error)) (Meta, error) {
+func newMeta(ctx context.Context, kv kv.MetaKv, factory dependency.Factory, idAllocator func() (UniqueID, error)) (Meta, error) {
 	childCtx, cancel := context.WithCancel(ctx)
 	collectionInfos := make(map[UniqueID]*querypb.CollectionInfo)
 	queryChannelInfos := make(map[UniqueID]*querypb.QueryChannelInfo)
@@ -139,7 +140,7 @@ func newMeta(ctx context.Context, kv kv.MetaKv, factory msgstream.Factory, idAll
 		ctx:         childCtx,
 		cancel:      cancel,
 		client:      kv,
-		msFactory:   factory,
+		factory:     factory,
 		idAllocator: idAllocator,
 
 		collectionInfos:   collectionInfos,
@@ -998,7 +999,7 @@ func (m *MetaReplica) getQueryStreamByID(collectionID UniqueID, queryChannel str
 	if stream, ok := m.queryStreams[collectionID]; ok {
 		queryStream = stream
 	} else {
-		queryStream, err = m.msFactory.NewMsgStream(m.ctx)
+		queryStream, err = m.factory.NewMsgStream(m.ctx)
 		if err != nil {
 			log.Error("updateGlobalSealedSegmentInfos: create msgStream failed", zap.Error(err))
 			return nil, err
