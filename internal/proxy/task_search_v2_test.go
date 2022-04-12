@@ -117,6 +117,20 @@ func getValidSearchParams() []*commonpb.KeyValuePair {
 		}}
 }
 
+func getSearchTask(t *testing.T, collName string, qc types.QueryCoord) *searchTaskV2 {
+	task := &searchTaskV2{
+		ctx:           context.TODO(),
+		SearchRequest: &internalpb.SearchRequest{},
+		request: &milvuspb.SearchRequest{
+			CollectionName: collName,
+		},
+		tr: timerecord.NewTimeRecorder("test-search"),
+		qc: qc,
+	}
+	require.NoError(t, task.OnEnqueue())
+	return task
+}
+
 func TestSearchTaskV2_PreExecute(t *testing.T) {
 	var err error
 
@@ -139,28 +153,14 @@ func TestSearchTaskV2_PreExecute(t *testing.T) {
 	defer qc.Stop()
 	require.NoError(t, err)
 
-	getSearchTask := func(t *testing.T, collName string) *searchTaskV2 {
-		task := &searchTaskV2{
-			ctx:           ctx,
-			SearchRequest: &internalpb.SearchRequest{},
-			request: &milvuspb.SearchRequest{
-				CollectionName: collName,
-			},
-			qc: qc,
-			tr: timerecord.NewTimeRecorder("test-search"),
-		}
-		require.NoError(t, task.OnEnqueue())
-		return task
-	}
-
 	t.Run("collection not exist", func(t *testing.T) {
-		task := getSearchTask(t, collectionName)
+		task := getSearchTask(t, collectionName, qc)
 		err = task.PreExecute(ctx)
 		assert.Error(t, err)
 	})
 
 	t.Run("invalid collection name", func(t *testing.T) {
-		task := getSearchTask(t, collectionName)
+		task := getSearchTask(t, collectionName, qc)
 		createColl(t, collectionName, rc)
 
 		invalidCollNameTests := []struct {
@@ -180,7 +180,7 @@ func TestSearchTaskV2_PreExecute(t *testing.T) {
 	})
 
 	t.Run("invalid partition names", func(t *testing.T) {
-		task := getSearchTask(t, collectionName)
+		task := getSearchTask(t, collectionName, qc)
 		createColl(t, collectionName, rc)
 
 		invalidCollNameTests := []struct {
@@ -205,7 +205,7 @@ func TestSearchTaskV2_PreExecute(t *testing.T) {
 		createColl(t, collName, rc)
 		collID, err := globalMetaCache.GetCollectionID(context.TODO(), collName)
 		require.NoError(t, err)
-		task := getSearchTask(t, collName)
+		task := getSearchTask(t, collName, qc)
 
 		t.Run("show collection err", func(t *testing.T) {
 			qc.SetShowCollectionsFunc(func(ctx context.Context, request *querypb.ShowCollectionsRequest) (*querypb.ShowCollectionsResponse, error) {
@@ -345,7 +345,7 @@ func TestSearchTaskV2_PreExecute(t *testing.T) {
 				createColl(t, collName, rc)
 				collID, err := globalMetaCache.GetCollectionID(context.TODO(), collName)
 				require.NoError(t, err)
-				task := getSearchTask(t, collName)
+				task := getSearchTask(t, collName, qc)
 				task.request.DslType = commonpb.DslType_BoolExprV1
 
 				status, err := qc.LoadCollection(ctx, &querypb.LoadCollectionRequest{
@@ -375,7 +375,7 @@ func TestSearchTaskV2_PreExecute(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, commonpb.ErrorCode_Success, status.GetErrorCode())
 
-		task := getSearchTask(t, collName)
+		task := getSearchTask(t, collName, qc)
 		task.request.SearchParams = getValidSearchParams()
 		task.request.DslType = commonpb.DslType_BoolExprV1
 
@@ -406,9 +406,10 @@ func TestSearchTaskV2_Execute(t *testing.T) {
 
 		rc  = NewRootCoordMock()
 		qc  = NewQueryCoordMock()
+		qn  = &QueryNodeMock{}
 		ctx = context.TODO()
 
-		collectionName = t.Name() + funcutil.GenRandomStr()
+		collName = t.Name() + funcutil.GenRandomStr()
 	)
 
 	err = rc.Start()
@@ -421,25 +422,72 @@ func TestSearchTaskV2_Execute(t *testing.T) {
 	require.NoError(t, err)
 	defer qc.Stop()
 
-	task := &searchTaskV2{
-		ctx: ctx,
-		SearchRequest: &internalpb.SearchRequest{
+	createColl(t, collName, rc)
+	collID, err := globalMetaCache.GetCollectionID(context.TODO(), collName)
+	require.NoError(t, err)
+	status, err := qc.LoadCollection(ctx, &querypb.LoadCollectionRequest{
+		Base: &commonpb.MsgBase{
+			MsgType: commonpb.MsgType_LoadCollection,
+		},
+		CollectionID: collID,
+	})
+	require.NoError(t, err)
+	require.Equal(t, commonpb.ErrorCode_Success, status.GetErrorCode())
+
+	t.Run("get shard leader err", func(t *testing.T) {
+		qc := NewQueryCoordMock()
+		require.NoError(t, qc.Start())
+		defer qc.Stop()
+		status, err := qc.LoadCollection(ctx, &querypb.LoadCollectionRequest{
 			Base: &commonpb.MsgBase{
-				MsgType:   commonpb.MsgType_Search,
-				Timestamp: uint64(time.Now().UnixNano()),
+				MsgType:  commonpb.MsgType_LoadCollection,
+				SourceID: Params.ProxyCfg.ProxyID,
 			},
-		},
-		request: &milvuspb.SearchRequest{
-			CollectionName: collectionName,
-		},
-		result: &milvuspb.SearchResults{
-			Status: &commonpb.Status{},
-		},
-		qc: qc,
-		tr: timerecord.NewTimeRecorder("search"),
-	}
-	require.NoError(t, task.OnEnqueue())
-	createColl(t, collectionName, rc)
+			CollectionID: collID,
+		})
+		require.NoError(t, err)
+		require.Equal(t, commonpb.ErrorCode_Success, status.GetErrorCode())
+
+		task := getSearchTask(t, collName, qc)
+		task.request.SearchParams = getValidSearchParams()
+		task.request.DslType = commonpb.DslType_BoolExprV1
+
+		err = task.OnEnqueue()
+		require.NoError(t, err)
+		err = task.PreExecute(ctx)
+		require.NoError(t, err)
+
+		qc.SetGetShardLeadersFunc(func(ctx context.Context, req *querypb.GetShardLeadersRequest) (*querypb.GetShardLeadersResponse, error) {
+			return nil, errors.New("mock error")
+		})
+		err = task.Execute(ctx)
+		assert.Error(t, err)
+
+		qc.SetGetShardLeadersFunc(func(ctx context.Context, req *querypb.GetShardLeadersRequest) (*querypb.GetShardLeadersResponse, error) {
+			return &querypb.GetShardLeadersResponse{
+				Status: &commonpb.Status{
+					ErrorCode: commonpb.ErrorCode_UnexpectedError},
+			}, nil
+		})
+		err = task.Execute(ctx)
+		assert.Error(t, err)
+	})
+
+	t.Run("searchShard", func(t *testing.T) {
+		task := getSearchTask(t, collName, qc)
+		task.request.SearchParams = getValidSearchParams()
+		task.request.DslType = commonpb.DslType_BoolExprV1
+
+		err = task.OnEnqueue()
+		require.NoError(t, err)
+		err = task.PreExecute(ctx)
+		require.NoError(t, err)
+
+		task.getQueryNodePolicy = func(ctx context.Context, addr string) (types.QueryNode, error) {
+			return qn, nil
+		}
+
+	})
 }
 
 func genSearchResultData(nq int64, topk int64, ids []int64, scores []float32) *schemapb.SearchResultData {

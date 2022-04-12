@@ -31,7 +31,7 @@ func TestQueryTaskV2_all(t *testing.T) {
 		ctx = context.TODO()
 
 		rc = NewRootCoordMock()
-		qc = NewQueryCoordMock(withValidShardLeaders())
+		qc = NewQueryCoordMock()
 		qn = &QueryNodeMock{}
 
 		shardsNum      = int32(2)

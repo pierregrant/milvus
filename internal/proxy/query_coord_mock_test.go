@@ -44,12 +44,6 @@ func SetQueryCoordShowCollectionsFunc(f queryCoordShowCollectionsFuncType) Query
 	}
 }
 
-func withValidShardLeaders() QueryCoordMockOption {
-	return func(mock *QueryCoordMock) {
-		mock.validShardLeaders = true
-	}
-}
-
 type QueryCoordMock struct {
 	nodeID  typeutil.UniqueID
 	address string
@@ -63,11 +57,10 @@ type QueryCoordMock struct {
 	showCollectionsFunc queryCoordShowCollectionsFuncType
 	getMetricsFunc      getMetricsFuncType
 	showPartitionsFunc  queryCoordShowPartitionsFuncType
+	getShardLeadersFunc queryCoordGetShardLeadersFuncType
 
 	statisticsChannel string
 	timeTickChannel   string
-
-	validShardLeaders bool
 }
 
 func (coord *QueryCoordMock) updateState(state internalpb.StateCode) {
@@ -373,6 +366,16 @@ func (coord *QueryCoordMock) GetReplicas(ctx context.Context, req *milvuspb.GetR
 	}, nil
 }
 
+func (coord *QueryCoordMock) ResetGetShardLeadersFunc() {
+	coord.getShardLeadersFunc = nil
+}
+
+func (coord *QueryCoordMock) SetGetShardLeadersFunc(f queryCoordGetShardLeadersFuncType) {
+	coord.getShardLeadersFunc = f
+}
+
+type queryCoordGetShardLeadersFuncType = func(ctx context.Context, req *querypb.GetShardLeadersRequest) (*querypb.GetShardLeadersResponse, error)
+
 func (coord *QueryCoordMock) GetShardLeaders(ctx context.Context, req *querypb.GetShardLeadersRequest) (*querypb.GetShardLeadersResponse, error) {
 	if !coord.healthy() {
 		return &querypb.GetShardLeadersResponse{
@@ -383,25 +386,19 @@ func (coord *QueryCoordMock) GetShardLeaders(ctx context.Context, req *querypb.G
 		}, nil
 	}
 
-	if coord.validShardLeaders {
-		return &querypb.GetShardLeadersResponse{
-			Status: &commonpb.Status{
-				ErrorCode: commonpb.ErrorCode_Success,
-			},
-			Shards: []*querypb.ShardLeadersList{
-				{
-					ChannelName: "channel-1",
-					NodeIds:     []int64{1, 2, 3},
-					NodeAddrs:   []string{"localhost:9000", "localhost:9001", "localhost:9002"},
-				},
-			},
-		}, nil
+	if coord.getShardLeadersFunc != nil {
+		return coord.getShardLeadersFunc(ctx, req)
 	}
 
 	return &querypb.GetShardLeadersResponse{
 		Status: &commonpb.Status{
-			ErrorCode: commonpb.ErrorCode_UnexpectedError,
-			Reason:    "not implemented",
+			ErrorCode: commonpb.ErrorCode_Success},
+		Shards: []*querypb.ShardLeadersList{
+			&querypb.ShardLeadersList{
+				ChannelName: "channel-1",
+				NodeIds:     []UniqueID{1},
+				NodeAddrs:   []string{"127.0.0.1:9999"},
+			},
 		},
 	}, nil
 }
