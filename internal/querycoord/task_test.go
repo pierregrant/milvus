@@ -639,10 +639,11 @@ func Test_RescheduleDmChannel(t *testing.T) {
 	loadCollectionTask := watchDmChannelTask.parentTask
 	queryCoord.scheduler.triggerTaskQueue.addTask(loadCollectionTask)
 
-	waitTaskFinalState(loadCollectionTask, taskExpired)
+	waitTaskFinalState(loadCollectionTask, taskFailed)
 
 	queryCoord.Stop()
 	err = removeAllSession()
+
 	assert.Nil(t, err)
 }
 
@@ -666,7 +667,7 @@ func Test_RescheduleSegment(t *testing.T) {
 	loadCollectionTask := loadSegmentTask.parentTask
 	queryCoord.scheduler.triggerTaskQueue.addTask(loadCollectionTask)
 
-	waitTaskFinalState(loadCollectionTask, taskExpired)
+	waitTaskFinalState(loadCollectionTask, taskFailed)
 
 	queryCoord.Stop()
 	err = removeAllSession()

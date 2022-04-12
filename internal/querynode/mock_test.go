@@ -1749,15 +1749,15 @@ func genSimpleQueryNodeWithMQFactory(ctx context.Context, fac dependency.Factory
 
 	// start task scheduler
 	go node.scheduler.Start()
-
-	vectorStorage, err := node.factory.NewVectorStorageChunkManager(ctx)
-	if err != nil {
-		return nil, err
-	}
-	cacheStorage, err := node.factory.NewCacheStorageChunkManager(ctx)
-	if err != nil {
-		return nil, err
-	}
+	/*
+		vectorStorage, err := node.factory.NewVectorStorageChunkManager(ctx)
+		if err != nil {
+			return nil, err
+		}
+		cacheStorage, err := node.factory.NewCacheStorageChunkManager(ctx)
+		if err != nil {
+			return nil, err
+		}*/
 	/*
 		qs := newQueryService(ctx, node.historical, node.streaming, vectorStorage, cacheStorage, fac)
 		defer qs.close()
@@ -1769,7 +1769,7 @@ func genSimpleQueryNodeWithMQFactory(ctx context.Context, fac dependency.Factory
 	// init shard cluster service
 	node.ShardClusterService = newShardClusterService(node.etcdCli, node.session, node)
 
-	node.queryShardService = newQueryShardService(node.queryNodeLoopCtx, node.historical, node.streaming, node.ShardClusterService, node.msFactory)
+	node.queryShardService = newQueryShardService(node.queryNodeLoopCtx, node.historical, node.streaming, node.ShardClusterService, node.factory)
 
 	node.UpdateStateCode(internalpb.StateCode_Healthy)
 
