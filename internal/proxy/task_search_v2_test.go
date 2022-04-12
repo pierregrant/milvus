@@ -27,6 +27,10 @@ import (
 	"github.com/milvus-io/milvus/internal/util/typeutil"
 )
 
+const (
+	testShardsNum = int32(2)
+)
+
 func TestSearchTaskV2_PostExecute(t *testing.T) {
 	t.Run("Test empty result", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -66,8 +70,8 @@ func TestSearchTaskV2_PostExecute(t *testing.T) {
 	})
 }
 
-func createColl(t *testing.T, fInt64 string, fFloatVec string, dim int, name string, shardNum int32, rc types.RootCoord) {
-	schema := constructCollectionSchema(fInt64, fFloatVec, dim, name)
+func createColl(t *testing.T, name string, rc types.RootCoord) {
+	schema := constructCollectionSchema(testInt64Field, testFloatVecField, testVecDim, name)
 	marshaledSchema, err := proto.Marshal(schema)
 	require.NoError(t, err)
 	ctx := context.TODO()
@@ -77,7 +81,7 @@ func createColl(t *testing.T, fInt64 string, fFloatVec string, dim int, name str
 		CreateCollectionRequest: &milvuspb.CreateCollectionRequest{
 			CollectionName: name,
 			Schema:         marshaledSchema,
-			ShardsNum:      shardNum,
+			ShardsNum:      testShardsNum,
 		},
 		ctx:       ctx,
 		rootCoord: rc,
@@ -89,6 +93,30 @@ func createColl(t *testing.T, fInt64 string, fFloatVec string, dim int, name str
 	require.NoError(t, createColT.PostExecute(ctx))
 }
 
+func getValidSearchParams() []*commonpb.KeyValuePair {
+	return []*commonpb.KeyValuePair{
+		{
+			Key:   AnnsFieldKey,
+			Value: testFloatVecField,
+		},
+		{
+			Key:   TopKKey,
+			Value: "10",
+		},
+		{
+			Key:   MetricTypeKey,
+			Value: distance.L2,
+		},
+		{
+			Key:   SearchParamsKey,
+			Value: `{"nprobe": 10}`,
+		},
+		{
+			Key:   RoundDecimalKey,
+			Value: "-1",
+		}}
+}
+
 func TestSearchTaskV2_PreExecute(t *testing.T) {
 	var err error
 
@@ -97,6 +125,8 @@ func TestSearchTaskV2_PreExecute(t *testing.T) {
 		rc  = NewRootCoordMock()
 		qc  = NewQueryCoordMock()
 		ctx = context.TODO()
+
+		collectionName = t.Name() + funcutil.GenRandomStr()
 	)
 
 	err = rc.Start()
@@ -109,21 +139,12 @@ func TestSearchTaskV2_PreExecute(t *testing.T) {
 	defer qc.Stop()
 	require.NoError(t, err)
 
-	var (
-		shardsNum      = int32(2)
-		dim            = 128
-		collectionName = t.Name() + funcutil.GenRandomStr()
-
-		int64Field    = "int64"
-		floatVecField = "fvec"
-	)
-
-	getSearchTask := func(t *testing.T) *searchTaskV2 {
+	getSearchTask := func(t *testing.T, collName string) *searchTaskV2 {
 		task := &searchTaskV2{
 			ctx:           ctx,
 			SearchRequest: &internalpb.SearchRequest{},
 			request: &milvuspb.SearchRequest{
-				CollectionName: collectionName,
+				CollectionName: collName,
 			},
 			qc: qc,
 			tr: timerecord.NewTimeRecorder("test-search"),
@@ -133,14 +154,14 @@ func TestSearchTaskV2_PreExecute(t *testing.T) {
 	}
 
 	t.Run("collection not exist", func(t *testing.T) {
-		task := getSearchTask(t)
+		task := getSearchTask(t, collectionName)
 		err = task.PreExecute(ctx)
 		assert.Error(t, err)
 	})
 
 	t.Run("invalid collection name", func(t *testing.T) {
-		task := getSearchTask(t)
-		createColl(t, int64Field, floatVecField, dim, collectionName, shardsNum, rc)
+		task := getSearchTask(t, collectionName)
+		createColl(t, collectionName, rc)
 
 		invalidCollNameTests := []struct {
 			inCollName  string
@@ -159,8 +180,8 @@ func TestSearchTaskV2_PreExecute(t *testing.T) {
 	})
 
 	t.Run("invalid partition names", func(t *testing.T) {
-		task := getSearchTask(t)
-		createColl(t, int64Field, floatVecField, dim, collectionName, shardsNum, rc)
+		task := getSearchTask(t, collectionName)
+		createColl(t, collectionName, rc)
 
 		invalidCollNameTests := []struct {
 			inPartNames []string
@@ -180,45 +201,106 @@ func TestSearchTaskV2_PreExecute(t *testing.T) {
 	})
 
 	t.Run("test checkIfLoaded error", func(t *testing.T) {
-		collID, err := globalMetaCache.GetCollectionID(context.TODO(), collectionName)
+		collName := "test_checkIfLoaded_error" + funcutil.GenRandomStr()
+		createColl(t, collName, rc)
+		collID, err := globalMetaCache.GetCollectionID(context.TODO(), collName)
 		require.NoError(t, err)
-		task := getSearchTask(t)
-		qc.SetShowCollectionsFunc(func(ctx context.Context, request *querypb.ShowCollectionsRequest) (*querypb.ShowCollectionsResponse, error) {
-			return nil, errors.New("mock")
+		task := getSearchTask(t, collName)
+
+		t.Run("show collection err", func(t *testing.T) {
+			qc.SetShowCollectionsFunc(func(ctx context.Context, request *querypb.ShowCollectionsRequest) (*querypb.ShowCollectionsResponse, error) {
+				return nil, errors.New("mock")
+			})
+
+			assert.False(t, task.checkIfLoaded(collID, []UniqueID{}))
 		})
 
-		assert.False(t, task.checkIfLoaded(collID, []UniqueID{}))
+		t.Run("show collection status unexpected error", func(t *testing.T) {
+			qc.SetShowCollectionsFunc(func(ctx context.Context, request *querypb.ShowCollectionsRequest) (*querypb.ShowCollectionsResponse, error) {
+				return &querypb.ShowCollectionsResponse{
+					Status: &commonpb.Status{
+						ErrorCode: commonpb.ErrorCode_UnexpectedError,
+						Reason:    "mock",
+					},
+				}, nil
+			})
 
-		qc.SetShowCollectionsFunc(func(ctx context.Context, request *querypb.ShowCollectionsRequest) (*querypb.ShowCollectionsResponse, error) {
-			return &querypb.ShowCollectionsResponse{
-				Status: &commonpb.Status{
-					ErrorCode: commonpb.ErrorCode_UnexpectedError,
-					Reason:    "mock",
-				},
-			}, nil
+			assert.False(t, task.checkIfLoaded(collID, []UniqueID{}))
+			assert.Error(t, task.PreExecute(ctx))
+			qc.ResetShowCollectionsFunc()
 		})
 
-		assert.False(t, task.checkIfLoaded(collID, []UniqueID{}))
-		assert.Error(t, task.PreExecute(ctx))
+		t.Run("show partition error", func(t *testing.T) {
+			qc.SetShowPartitionsFunc(func(ctx context.Context, req *querypb.ShowPartitionsRequest) (*querypb.ShowPartitionsResponse, error) {
+				return &querypb.ShowPartitionsResponse{
+					Status: &commonpb.Status{
+						ErrorCode: commonpb.ErrorCode_UnexpectedError,
+						Reason:    "mock",
+					},
+				}, nil
+			})
+			assert.False(t, task.checkIfLoaded(collID, []UniqueID{1}))
+		})
+
+		t.Run("show partition status unexpected error", func(t *testing.T) {
+			qc.SetShowPartitionsFunc(func(ctx context.Context, req *querypb.ShowPartitionsRequest) (*querypb.ShowPartitionsResponse, error) {
+				return nil, errors.New("mock error")
+			})
+			assert.False(t, task.checkIfLoaded(collID, []UniqueID{1}))
+		})
+
+		t.Run("show partitions success", func(t *testing.T) {
+			qc.SetShowPartitionsFunc(func(ctx context.Context, req *querypb.ShowPartitionsRequest) (*querypb.ShowPartitionsResponse, error) {
+				return &querypb.ShowPartitionsResponse{
+					Status: &commonpb.Status{
+						ErrorCode: commonpb.ErrorCode_Success,
+					},
+				}, nil
+			})
+			assert.True(t, task.checkIfLoaded(collID, []UniqueID{1}))
+			qc.ResetShowPartitionsFunc()
+		})
+
+		t.Run("show collection success but not loaded", func(t *testing.T) {
+			qc.SetShowCollectionsFunc(func(ctx context.Context, request *querypb.ShowCollectionsRequest) (*querypb.ShowCollectionsResponse, error) {
+				return &querypb.ShowCollectionsResponse{
+					Status: &commonpb.Status{
+						ErrorCode: commonpb.ErrorCode_Success,
+					},
+					CollectionIDs:       []UniqueID{collID},
+					InMemoryPercentages: []int64{0},
+				}, nil
+			})
+
+			qc.SetShowPartitionsFunc(func(ctx context.Context, req *querypb.ShowPartitionsRequest) (*querypb.ShowPartitionsResponse, error) {
+				return nil, errors.New("mock error")
+			})
+			assert.False(t, task.checkIfLoaded(collID, []UniqueID{}))
+
+			qc.SetShowPartitionsFunc(func(ctx context.Context, req *querypb.ShowPartitionsRequest) (*querypb.ShowPartitionsResponse, error) {
+				return nil, errors.New("mock error")
+			})
+			assert.False(t, task.checkIfLoaded(collID, []UniqueID{}))
+
+			qc.SetShowPartitionsFunc(func(ctx context.Context, req *querypb.ShowPartitionsRequest) (*querypb.ShowPartitionsResponse, error) {
+				return &querypb.ShowPartitionsResponse{
+					Status: &commonpb.Status{
+						ErrorCode: commonpb.ErrorCode_Success,
+					},
+					PartitionIDs: []UniqueID{1},
+				}, nil
+			})
+			assert.True(t, task.checkIfLoaded(collID, []UniqueID{}))
+		})
+
 		qc.ResetShowCollectionsFunc()
+		qc.ResetShowPartitionsFunc()
 	})
-
-	createColl(t, int64Field, floatVecField, dim, collectionName, shardsNum, rc)
-	collID, err := globalMetaCache.GetCollectionID(context.TODO(), collectionName)
-	require.NoError(t, err)
-	status, err := qc.LoadCollection(ctx, &querypb.LoadCollectionRequest{
-		Base: &commonpb.MsgBase{
-			MsgType: commonpb.MsgType_LoadCollection,
-		},
-		CollectionID: collID,
-	})
-	require.NoError(t, err)
-	require.Equal(t, commonpb.ErrorCode_Success, status.GetErrorCode())
 
 	t.Run("invalid key value pairs", func(t *testing.T) {
 		spNoTopk := []*commonpb.KeyValuePair{{
 			Key:   AnnsFieldKey,
-			Value: floatVecField}}
+			Value: testFloatVecField}}
 
 		spInvalidTopk := append(spNoTopk, &commonpb.KeyValuePair{
 			Key:   TopKKey,
@@ -249,49 +331,51 @@ func TestSearchTaskV2_PreExecute(t *testing.T) {
 			description   string
 			invalidParams []*commonpb.KeyValuePair
 		}{
-			{"No topk", spNoTopk},
-			{"Invalid topk", spInvalidTopk},
-			{"No Metric type", spNoMetricType},
-			{"No search params", spNoSearchParams},
-			{"no round decimal", spNoRoundDecimal},
-			{"Invalid round decimal", spInvalidRoundDecimal},
+			{"No_topk", spNoTopk},
+			{"Invalid_topk", spInvalidTopk},
+			{"No_Metric_type", spNoMetricType},
+			{"No_search_params", spNoSearchParams},
+			{"no_round_decimal", spNoRoundDecimal},
+			{"Invalid_round_decimal", spInvalidRoundDecimal},
 		}
 
-		task := getSearchTask(t)
-		task.request.DslType = commonpb.DslType_BoolExprV1
 		for _, test := range tests {
 			t.Run(test.description, func(t *testing.T) {
+				collName := "collection_" + test.description
+				createColl(t, collName, rc)
+				collID, err := globalMetaCache.GetCollectionID(context.TODO(), collName)
+				require.NoError(t, err)
+				task := getSearchTask(t, collName)
+				task.request.DslType = commonpb.DslType_BoolExprV1
+
+				status, err := qc.LoadCollection(ctx, &querypb.LoadCollectionRequest{
+					Base: &commonpb.MsgBase{
+						MsgType: commonpb.MsgType_LoadCollection,
+					},
+					CollectionID: collID,
+				})
+				require.NoError(t, err)
+				require.Equal(t, commonpb.ErrorCode_Success, status.GetErrorCode())
 				assert.Error(t, task.PreExecute(ctx))
 			})
 		}
 	})
 
-	getValidSearchParams := func() []*commonpb.KeyValuePair {
-		return []*commonpb.KeyValuePair{
-			{
-				Key:   AnnsFieldKey,
-				Value: floatVecField,
-			},
-			{
-				Key:   TopKKey,
-				Value: "10",
-			},
-			{
-				Key:   MetricTypeKey,
-				Value: distance.L2,
-			},
-			{
-				Key:   SearchParamsKey,
-				Value: `{"nprobe": 10}`,
-			},
-			{
-				Key:   RoundDecimalKey,
-				Value: "-1",
-			}}
-	}
-
 	t.Run("search with timeout", func(t *testing.T) {
-		task := getSearchTask(t)
+		collName := "search_with_timeout" + funcutil.GenRandomStr()
+		createColl(t, collName, rc)
+		collID, err := globalMetaCache.GetCollectionID(context.TODO(), collName)
+		require.NoError(t, err)
+		status, err := qc.LoadCollection(ctx, &querypb.LoadCollectionRequest{
+			Base: &commonpb.MsgBase{
+				MsgType: commonpb.MsgType_LoadCollection,
+			},
+			CollectionID: collID,
+		})
+		require.NoError(t, err)
+		require.Equal(t, commonpb.ErrorCode_Success, status.GetErrorCode())
+
+		task := getSearchTask(t, collName)
 		task.request.SearchParams = getValidSearchParams()
 		task.request.DslType = commonpb.DslType_BoolExprV1
 
@@ -302,40 +386,16 @@ func TestSearchTaskV2_PreExecute(t *testing.T) {
 		task.ctx = ctxTimeout
 		assert.NoError(t, task.PreExecute(ctx))
 		assert.Greater(t, task.TimeoutTimestamp, typeutil.ZeroTimestamp)
-	})
 
-	t.Run("field not exist", func(t *testing.T) {
-		task := getSearchTask(t)
-		task.request.DslType = commonpb.DslType_BoolExprV1
-		task.request.SearchParams = getValidSearchParams()
+		// field not exist
+		task.ctx = context.TODO()
+		task.request.OutputFields = []string{testInt64Field + funcutil.GenRandomStr()}
+		assert.Error(t, task.PreExecute(ctx))
 
-		task.request.OutputFields = []string{int64Field + funcutil.GenRandomStr()}
+		// contain vector field
+		task.request.OutputFields = []string{testFloatVecField}
 		assert.Error(t, task.PreExecute(ctx))
 	})
-
-	t.Run("contain vector field", func(t *testing.T) {
-		task := getSearchTask(t)
-		task.request.DslType = commonpb.DslType_BoolExprV1
-		task.request.SearchParams = getValidSearchParams()
-
-		task.request.OutputFields = []string{floatVecField}
-		assert.Error(t, task.PreExecute(ctx))
-	})
-
-	t.Run("show partition failed", func(t *testing.T) {
-		task := getSearchTask(t)
-		task.request.DslType = commonpb.DslType_BoolExprV1
-		task.request.SearchParams = getValidSearchParams()
-		task.request.OutputFields = []string{int64Field}
-
-		rc.showPartitionsFunc = func(ctx context.Context, request *milvuspb.ShowPartitionsRequest) (*milvuspb.ShowPartitionsResponse, error) {
-			return nil, errors.New("mock")
-		}
-		assert.Error(t, task.PreExecute(ctx))
-		rc.showPartitionsFunc = nil
-
-	})
-	// TODO: test partition-related error
 }
 
 func TestSearchTaskV2_Execute(t *testing.T) {
@@ -348,10 +408,6 @@ func TestSearchTaskV2_Execute(t *testing.T) {
 		qc  = NewQueryCoordMock()
 		ctx = context.TODO()
 
-		shardsNum      = int32(2)
-		int64Field     = "int64"
-		floatVecField  = "fvec"
-		dim            = 128
 		collectionName = t.Name() + funcutil.GenRandomStr()
 	)
 
@@ -383,7 +439,7 @@ func TestSearchTaskV2_Execute(t *testing.T) {
 		tr: timerecord.NewTimeRecorder("search"),
 	}
 	require.NoError(t, task.OnEnqueue())
-	createColl(t, int64Field, floatVecField, dim, collectionName, shardsNum, rc)
+	createColl(t, collectionName, rc)
 }
 
 func genSearchResultData(nq int64, topk int64, ids []int64, scores []float32) *schemapb.SearchResultData {

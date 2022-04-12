@@ -36,6 +36,8 @@ type QueryCoordMockOption func(mock *QueryCoordMock)
 
 type queryCoordShowCollectionsFuncType func(ctx context.Context, request *querypb.ShowCollectionsRequest) (*querypb.ShowCollectionsResponse, error)
 
+type queryCoordShowPartitionsFuncType func(ctx context.Context, request *querypb.ShowPartitionsRequest) (*querypb.ShowPartitionsResponse, error)
+
 func SetQueryCoordShowCollectionsFunc(f queryCoordShowCollectionsFuncType) QueryCoordMockOption {
 	return func(mock *QueryCoordMock) {
 		mock.showCollectionsFunc = f
@@ -60,6 +62,7 @@ type QueryCoordMock struct {
 
 	showCollectionsFunc queryCoordShowCollectionsFuncType
 	getMetricsFunc      getMetricsFuncType
+	showPartitionsFunc  queryCoordShowPartitionsFuncType
 
 	statisticsChannel string
 	timeTickChannel   string
@@ -231,6 +234,14 @@ func (coord *QueryCoordMock) ReleaseCollection(ctx context.Context, req *querypb
 	}, nil
 }
 
+func (coord *QueryCoordMock) SetShowPartitionsFunc(f queryCoordShowPartitionsFuncType) {
+	coord.showPartitionsFunc = f
+}
+
+func (coord *QueryCoordMock) ResetShowPartitionsFunc() {
+	coord.showPartitionsFunc = nil
+}
+
 func (coord *QueryCoordMock) ShowPartitions(ctx context.Context, req *querypb.ShowPartitionsRequest) (*querypb.ShowPartitionsResponse, error) {
 	if !coord.healthy() {
 		return &querypb.ShowPartitionsResponse{
@@ -239,6 +250,10 @@ func (coord *QueryCoordMock) ShowPartitions(ctx context.Context, req *querypb.Sh
 				Reason:    "unhealthy",
 			},
 		}, nil
+	}
+
+	if coord.showPartitionsFunc != nil {
+		return coord.showPartitionsFunc(ctx, req)
 	}
 
 	panic("implement me")
