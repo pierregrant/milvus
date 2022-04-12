@@ -93,7 +93,7 @@ func newQueryShard(
 		localChunkManager:  localChunkManager,
 		remoteChunkManager: remoteChunkManager,
 		localCacheEnabled:  localCacheEnabled,
-		localCacheSize:     Params.QueryNodeCfg.LocalFileCacheLimit,
+		localCacheSize:     Params.QueryNodeCfg.CacheMemoryLimit,
 
 		watcherCond: sync.NewCond(&sync.Mutex{}),
 	}

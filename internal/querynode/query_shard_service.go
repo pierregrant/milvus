@@ -23,8 +23,8 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/milvus-io/milvus/internal/mq/msgstream"
 	"github.com/milvus-io/milvus/internal/storage"
+	"github.com/milvus-io/milvus/internal/util/dependency"
 )
 
 type queryShardService struct {
@@ -37,7 +37,7 @@ type queryShardService struct {
 	queryChannelMu sync.Mutex              // guards queryChannels
 	queryChannels  map[int64]*queryChannel // Collection ID -> query channel
 
-	factory msgstream.Factory
+	factory dependency.Factory
 
 	historical *historical
 	streaming  *streaming
@@ -48,7 +48,7 @@ type queryShardService struct {
 	localCacheEnabled   bool
 }
 
-func newQueryShardService(ctx context.Context, historical *historical, streaming *streaming, clusterService *ShardClusterService, factory msgstream.Factory) *queryShardService {
+func newQueryShardService(ctx context.Context, historical *historical, streaming *streaming, clusterService *ShardClusterService, factory dependency.Factory) *queryShardService {
 	queryShardServiceCtx, queryShardServiceCancel := context.WithCancel(ctx)
 
 	path := Params.LoadWithDefault("localStorage.Path", "/tmp/milvus/data")

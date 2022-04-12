@@ -166,7 +166,7 @@ func (qc *QueryCoord) Init() error {
 		qc.factory.Init(&Params)
 
 		// init meta
-		qc.meta, initError = newMeta(qc.loopCtx, qc.kvClient, qc.factory, qc.idAllocator)
+		qc.meta, initError = newMeta(qc.loopCtx, qc.kvClient, qc.msFactory, qc.idAllocator)
 		if initError != nil {
 			log.Error("query coordinator init meta failed", zap.Error(initError))
 			return
@@ -174,7 +174,7 @@ func (qc *QueryCoord) Init() error {
 		qc.groupBalancer = newReplicaBalancer(qc.meta)
 
 		// init channelUnsubscribeHandler
-		qc.handler, initError = newChannelUnsubscribeHandler(qc.loopCtx, qc.kvClient, qc.factory)
+		qc.handler, initError = newChannelUnsubscribeHandler(qc.loopCtx, qc.kvClient, qc.msFactory)
 		if initError != nil {
 			log.Error("query coordinator init channelUnsubscribeHandler failed", zap.Error(initError))
 			return
@@ -302,7 +302,7 @@ func NewQueryCoord(ctx context.Context, factory dependency.Factory) (*QueryCoord
 	service := &QueryCoord{
 		loopCtx:    ctx1,
 		loopCancel: cancel,
-		factory:    factory,
+		msFactory:  factory,
 		newNodeFn:  newQueryNode,
 	}
 

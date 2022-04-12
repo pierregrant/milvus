@@ -133,8 +133,6 @@ func NewQueryNode(ctx context.Context, factory dependency.Factory) *QueryNode {
 		queryNodeLoopCtx:    ctx1,
 		queryNodeLoopCancel: cancel,
 		factory:             factory,
-		//queryService:        nil,
-		msFactory: factory,
 	}
 
 	node.scheduler = newTaskScheduler(ctx1)
@@ -355,20 +353,6 @@ func (node *QueryNode) Init() error {
 
 // Start mainly start QueryNode's query service.
 func (node *QueryNode) Start() error {
-	err := node.msFactory.Init(&Params)
-	if err != nil {
-		return err
-	}
-
-	// init services and manager
-	// TODO: pass node.streaming.replica to search service
-	/*
-		node.queryService = newQueryService(node.queryNodeLoopCtx,
-			node.historical,
-			node.streaming,
-			node.msFactory,
-			qsOptWithSessionManager(node.sessionManager))*/
-
 	// start task scheduler
 	go node.scheduler.Start()
 
@@ -387,7 +371,7 @@ func (node *QueryNode) Start() error {
 	// create shardClusterService for shardLeader functions.
 	node.ShardClusterService = newShardClusterService(node.etcdCli, node.session, node)
 	// create shard-level query service
-	node.queryShardService = newQueryShardService(node.queryNodeLoopCtx, node.historical, node.streaming, node.ShardClusterService, node.msFactory)
+	node.queryShardService = newQueryShardService(node.queryNodeLoopCtx, node.historical, node.streaming, node.ShardClusterService, node.factory)
 
 	Params.QueryNodeCfg.CreatedTime = time.Now()
 	Params.QueryNodeCfg.UpdatedTime = time.Now()

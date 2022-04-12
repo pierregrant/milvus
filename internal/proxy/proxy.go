@@ -106,11 +106,10 @@ func NewProxy(ctx context.Context, factory dependency.Factory) (*Proxy, error) {
 	ctx1, cancel := context.WithCancel(ctx)
 	n := 1024 // better to be configurable
 	node := &Proxy{
-		ctx:              ctx1,
-		cancel:           cancel,
-		factory:          factory,
-		searchResultCh:   make(chan *internalpb.SearchResults, n),
-		retrieveResultCh: make(chan *internalpb.RetrieveResults, n),
+		ctx:            ctx1,
+		cancel:         cancel,
+		factory:        factory,
+		searchResultCh: make(chan *internalpb.SearchResults, n),
 	}
 	node.UpdateStateCode(internalpb.StateCode_Abnormal)
 	logutil.Logger(ctx).Debug("create a new Proxy instance", zap.Any("state", node.stateCode.Load()))
@@ -227,9 +226,7 @@ func (node *Proxy) Init() error {
 	log.Debug("create channels manager done", zap.String("role", typeutil.ProxyRole))
 
 	log.Debug("create task scheduler", zap.String("role", typeutil.ProxyRole))
-	node.sched, err = newTaskScheduler(node.ctx, node.idAllocator, node.tsoAllocator, node.factory,
-		schedOptWithSearchResultCh(node.searchResultCh),
-		schedOptWithRetrieveResultCh(node.retrieveResultCh))
+	node.sched, err = newTaskScheduler(node.ctx, node.idAllocator, node.tsoAllocator, node.factory)
 	if err != nil {
 		log.Warn("failed to create task scheduler", zap.Error(err), zap.String("role", typeutil.ProxyRole))
 		return err
