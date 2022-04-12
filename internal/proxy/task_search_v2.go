@@ -449,7 +449,7 @@ func (t *searchTaskV2) RoundRobin(query func(UniqueID, types.QueryNode) error, l
 	}
 
 	if current == replicaNum && err != nil {
-		return fmt.Errorf("no shard leaders available for channel: %s, leaders: %v", leaders.GetChannelName(), leaders.GetNodeIds())
+		return fmt.Errorf("no shard leaders available for channel: %s, leaders: %v, err: %s", leaders.GetChannelName(), leaders.GetNodeIds(), err.Error())
 	}
 	return nil
 }
@@ -487,27 +487,6 @@ func (t *searchTaskV2) checkIfLoaded(collectionID UniqueID, searchPartitionIDs [
 		}
 		// Current logic: show partitions won't return error if the given partitions are all loaded
 		return true
-
-		// getIndex := func(target UniqueID, partitionIDs []UniqueID) int {
-		//     for index, pID := range partitionIDs {
-		//         if target == pID {
-		//             return index
-		//         }
-		//     }
-		//     return -1
-		// }
-		//
-		// for _, pID := range partitionIDs {
-		//     i := getIndex(pID, resp.GetPartitionIDs())
-		//     if i == -1 {
-		//         return false
-		//     }
-		//
-		//     if resp.GetInMemoryPercentages()[i] < 100 {
-		//         return false
-		//     }
-		// }
-		// return true
 	}
 
 	// If request to search collection
