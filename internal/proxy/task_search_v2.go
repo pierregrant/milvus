@@ -313,6 +313,7 @@ func (t *searchTaskV2) PostExecute(ctx context.Context) error {
 				log.Debug("all searches are finished or canceled", zap.Any("taskID", t.ID()))
 				close(t.resultBuf)
 				for res := range t.resultBuf {
+					// TODO: check ErrorCode in result
 					t.toReduceResults = append(t.toReduceResults, res)
 					log.Debug("proxy receives one query result", zap.Int64("sourceID", res.GetBase().GetSourceID()), zap.Any("taskID", t.ID()))
 				}
@@ -344,6 +345,13 @@ func (t *searchTaskV2) PostExecute(ctx context.Context) error {
 				Reason:    "search result is empty",
 			},
 			CollectionName: t.collectionName,
+		}
+		// add information if any
+		if len(t.toReduceResults) > 0 {
+			t.result.Results = &schemapb.SearchResultData{
+				NumQueries: t.toReduceResults[0].NumQueries,
+				Topks:      make([]int64, t.toReduceResults[0].NumQueries),
+			}
 		}
 		return nil
 	}
