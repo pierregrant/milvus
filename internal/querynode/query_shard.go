@@ -384,37 +384,27 @@ func (q *queryShard) searchLeader(ctx context.Context, req *querypb.SearchReques
 		if err != nil {
 			return nil, err
 		}
-		marshaledHits, err := reorganizeSearchResults(streamingResults, numSegment)
-		if err != nil {
-			return nil, err
-		}
-		defer deleteMarshaledHits(marshaledHits)
 
-		// transform (hard to understand)
-		hitsBlob, err := marshaledHits.getHitsBlob()
+		nq := searchRequests[0].getNumOfQuery()
+		nqOfReqs := []int64{nq}
+		nqPerSlice := nq
+		reqSlices, err := getReqSlices(nqOfReqs, nqPerSlice)
 		if err != nil {
+			log.Warn("getReqSlices for streaming results error", zap.Error(err))
 			return nil, err
 		}
 
-		hitBlobSizePeerQuery, err := marshaledHits.hitBlobSizeInGroup(int64(0))
+		blobs, err := marshal(collectionID, 0, streamingResults, int(numSegment), reqSlices)
+		defer deleteSearchResultDataBlobs(blobs)
 		if err != nil {
+			log.Warn("marshal for streaming results error", zap.Error(err))
 			return nil, err
 		}
 
-		var offset int64
-		hits := make([][]byte, len(hitBlobSizePeerQuery))
-		for i, length := range hitBlobSizePeerQuery {
-			hits[i] = hitsBlob[offset : offset+length]
-			offset += length
-		}
-
-		transformed, err := translateHits(schemaHelper, req.Req.OutputFieldsId, hits)
+		// assume only one blob will be sent back
+		blob, err := getSearchResultDataBlob(blobs, 0)
 		if err != nil {
-			return nil, err
-		}
-		byteBlobs, err := proto.Marshal(transformed)
-		if err != nil {
-			return nil, err
+			log.Warn("getSearchResultDataBlob for streaming results error", zap.Error(err))
 		}
 
 		// complete results with merged streaming result
@@ -423,7 +413,7 @@ func (q *queryShard) searchLeader(ctx context.Context, req *querypb.SearchReques
 			MetricType:     plan.getMetricType(),
 			NumQueries:     queryNum,
 			TopK:           topK,
-			SlicedBlob:     byteBlobs,
+			SlicedBlob:     blob,
 			SlicedOffset:   1,
 			SlicedNumCount: 1,
 		})
@@ -489,49 +479,39 @@ func (q *queryShard) searchFollower(ctx context.Context, req *querypb.SearchRequ
 	guaranteeTs := req.GetReq().GetGuaranteeTimestamp()
 	q.waitUntilServiceable(ctx, guaranteeTs, tsTypeDelta)
 	// search each segments by segment IDs in request
-	searchResults, _, err := q.historical.searchSegments(segmentIDs, searchRequests, plan, timestamp)
+	historicalResults, _, err := q.historical.searchSegments(segmentIDs, searchRequests, plan, timestamp)
 	if err != nil {
 		return nil, err
 	}
-	defer deleteSearchResults(searchResults)
+	defer deleteSearchResults(historicalResults)
 
 	// reduce search results
-	numSegment := int64(len(searchResults))
-	err = reduceSearchResultsAndFillData(plan, searchResults, numSegment)
-	if err != nil {
-		return nil, err
-	}
-	marshaledHits, err := reorganizeSearchResults(searchResults, numSegment)
-	if err != nil {
-		return nil, err
-	}
-	defer deleteMarshaledHits(marshaledHits)
-
-	// transform (hard to understand)
-	hitsBlob, err := marshaledHits.getHitsBlob()
+	numSegment := int64(len(historicalResults))
+	err = reduceSearchResultsAndFillData(plan, historicalResults, numSegment)
 	if err != nil {
 		return nil, err
 	}
 
-	hitBlobSizePeerQuery, err := marshaledHits.hitBlobSizeInGroup(int64(0))
+	nq := searchRequests[0].getNumOfQuery()
+	nqOfReqs := []int64{nq}
+	nqPerSlice := nq
+	reqSlices, err := getReqSlices(nqOfReqs, nqPerSlice)
 	if err != nil {
+		log.Warn("getReqSlices for historical results error", zap.Error(err))
 		return nil, err
 	}
 
-	var offset int64
-	hits := make([][]byte, len(hitBlobSizePeerQuery))
-	for i, length := range hitBlobSizePeerQuery {
-		hits[i] = hitsBlob[offset : offset+length]
-		offset += length
+	blobs, err := marshal(collectionID, 0, historicalResults, int(numSegment), reqSlices)
+	defer deleteSearchResultDataBlobs(blobs)
+	if err != nil {
+		log.Warn("marshal for historical results error", zap.Error(err))
+		return nil, err
 	}
 
-	transformed, err := translateHits(schemaHelper, req.Req.OutputFieldsId, hits)
+	// assume only one blob will be sent back
+	blob, err := getSearchResultDataBlob(blobs, 0)
 	if err != nil {
-		return nil, err
-	}
-	byteBlobs, err := proto.Marshal(transformed)
-	if err != nil {
-		return nil, err
+		log.Warn("getSearchResultDataBlob for historical results error", zap.Error(err))
 	}
 
 	resp := &internalpb.SearchResults{
@@ -539,13 +519,12 @@ func (q *queryShard) searchFollower(ctx context.Context, req *querypb.SearchRequ
 		MetricType:     plan.getMetricType(),
 		NumQueries:     queryNum,
 		TopK:           topK,
-		SlicedBlob:     byteBlobs,
+		SlicedBlob:     blob,
 		SlicedOffset:   1,
 		SlicedNumCount: 1,
 	}
 	log.Debug("shard follower send search result to leader")
 	return resp, nil
-
 }
 
 func reduceSearchResultData(searchResultData []*schemapb.SearchResultData, nq int64, topk int64, metricType string) (*schemapb.SearchResultData, error) {

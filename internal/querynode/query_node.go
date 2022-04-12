@@ -323,7 +323,7 @@ func (node *QueryNode) Init() error {
 			node.vectorStorage,
 			node.factory)
 
-		//node.statsService = newStatsService(node.queryNodeLoopCtx, node.historical.replica, node.factory)
+		// node.statsService = newStatsService(node.queryNodeLoopCtx, node.historical.replica, node.factory)
 		node.dataSyncService = newDataSyncService(node.queryNodeLoopCtx, streamingReplica, historicalReplica, node.tSafeReplica, node.factory)
 
 		node.InitSegcore()
@@ -333,13 +333,13 @@ func (node *QueryNode) Init() error {
 
 		// init services and manager
 		// TODO: pass node.streaming.replica to search service
-		node.queryService = newQueryService(node.queryNodeLoopCtx,
-			node.historical,
-			node.streaming,
-			node.vectorStorage,
-			node.cacheStorage,
-			node.factory,
-			qsOptWithSessionManager(node.sessionManager))
+		// node.queryService = newQueryService(node.queryNodeLoopCtx,
+		// 	node.historical,
+		// 	node.streaming,
+		// 	node.vectorStorage,
+		// 	node.cacheStorage,
+		// 	node.factory,
+		// 	qsOptWithSessionManager(node.sessionManager))
 
 		log.Debug("query node init successfully",
 			zap.Any("queryNodeID", Params.QueryNodeCfg.QueryNodeID),
